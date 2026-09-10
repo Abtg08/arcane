@@ -5,20 +5,29 @@
  * without spawning a listener.
  */
 
-import Fastify from 'fastify';
+import Fastify, { type FastifyInstance, type FastifyBaseLogger } from 'fastify';
 import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
 import swagger from '@fastify/swagger';
 import swaggerUi from '@fastify/swagger-ui';
-import type { FastifyInstance } from 'fastify';
-import type pino from 'pino';
+import { Redis } from 'ioredis';
+import { authMiddleware } from '@arcane/auth';
+import type { DbPool } from '@arcane/core';
 import type { ApiConfig } from '@arcane/config';
 
-export async function buildApp(config: ApiConfig, logger: pino.Logger): Promise<FastifyInstance> {
+export interface AppDependencies {
+  db: DbPool;
+}
+
+export async function buildApp(
+  config: ApiConfig,
+  logger: FastifyBaseLogger,
+  deps: AppDependencies,
+): Promise<FastifyInstance> {
+  const { db } = deps;
   const app = Fastify({
-    loggerInstance: logger,
-    // requestIdLogLabel is trace-id injected by OTel transport
+    logger,
     genReqId: () => crypto.randomUUID(),
     requestIdLogLabel: 'request_id',
   });
@@ -29,8 +38,9 @@ export async function buildApp(config: ApiConfig, logger: pino.Logger): Promise<
     contentSecurityPolicy: false,
   });
 
+  // CORS_ORIGINS is already string[] (transformed by Zod)
   await app.register(cors, {
-    origin: config.CORS_ORIGINS.split(',').map((o) => o.trim()),
+    origin: config.CORS_ORIGINS,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Api-Key'],
   });
@@ -99,15 +109,24 @@ export async function buildApp(config: ApiConfig, logger: pino.Logger): Promise<
     },
   });
 
-  // ─── Routes ───────────────────────────────────────────────────────────────────
-  // Registered here; implementation in routes/ directory
-  await app.register(import('./routes/health.js'));
+  // ─── Auth middleware ──────────────────────────────────────────────────────────
+  // Registered before routes so req.apiKey / req.session decorators are available
+  const redis = new Redis(config.VALKEY_URL, { lazyConnect: true });
+  await app.register(authMiddleware, {
+    db,
+    redis,
+    jwtSecret: config.JWT_SECRET,
+    apiKeyPrefix: config.API_KEY_PREFIX,
+  });
 
-  // TODO Phase 1-C+: register auth middleware + all route handlers
-  // await app.register(import('./routes/sessions.js'));
-  // await app.register(import('./routes/connections.js'));
-  // await app.register(import('./routes/tools.js'));
-  // await app.register(import('./routes/executions.js'));
+  // ─── Routes ───────────────────────────────────────────────────────────────────
+  await app.register(import('./routes/health.js'));
+  await app.register(import('./routes/sessions.js'), { config });
+  await app.register(import('./routes/connections.js'), { config });
+  await app.register(import('./routes/tools.js'), { config });
+  await app.register(import('./routes/executions.js'), { config });
+
+  // TODO Phase 2+:
   // await app.register(import('./routes/policies.js'));
   // await app.register(import('./routes/triggers.js'));
   // await app.register(import('./routes/admin.js'));
