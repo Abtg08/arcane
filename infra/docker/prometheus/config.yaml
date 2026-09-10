@@ -1,0 +1,31 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: 'otel-collector'
+    static_configs:
+      - targets: ['otel-collector:8888']
+
+  - job_name: 'arcane-api'
+    static_configs:
+      - targets: ['host.docker.internal:3001']
+    metrics_path: /metrics
+
+  - job_name: 'arcane-mcp'
+    static_configs:
+      - targets: ['host.docker.internal:3002']
+    metrics_path: /metrics
+
+  - job_name: 'arcane-webhook-ingress'
+    static_configs:
+      - targets: ['host.docker.internal:3003']
+    metrics_path: /metrics
+
+  - job_name: 'nats'
+    static_configs:
+      - targets: ['nats:8222']
+    metrics_path: /metrics
+
+remote_write:
+  - url: http://localhost:9090/api/v1/write

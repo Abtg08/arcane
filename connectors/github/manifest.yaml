@@ -1,0 +1,418 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+# Arcane Connector Manifest — GitHub
+# Version: 1.0.0
+#
+# SECURITY NOTE: This manifest contains NO secrets, NO API keys, NO tokens.
+# Credentials are stored encrypted via the KMS. This file is public.
+# ═══════════════════════════════════════════════════════════════════════════════
+
+id: github
+slug: github
+name: GitHub
+description: >
+  Create and manage issues, PRs, repositories, and code review workflows.
+  Powers AI agents to interact with your GitHub organization.
+version: "1.0.0"
+category: developer-tools
+icon_url: https://cdn.arcane.dev/connectors/github/icon.svg
+
+auth:
+  type: oauth2
+  oauth2:
+    authorization_url: https://github.com/login/oauth/authorize
+    token_url: https://github.com/login/oauth/access_token
+    scopes:
+      - repo
+      - read:org
+      - read:user
+      - issues:write
+      - pull_requests:write
+    # PKCE not supported by GitHub — uses client credentials + state
+    pkce: false
+    # Token refresh: GitHub personal access tokens don't expire;
+    # OAuth tokens have no standard refresh — re-auth on expiry
+    refresh_supported: false
+  # Hint shown to users during connection setup
+  connect_hint: >
+    You'll be redirected to GitHub to authorize Arcane.
+    Grant the minimum permissions your workflows need.
+
+base_url: https://api.github.com
+default_headers:
+  Accept: application/vnd.github+json
+  X-GitHub-Api-Version: "2022-11-28"
+  # Authorization: Bearer {token} — injected by credential resolver at runtime
+
+# Rate limits — used to pre-flight and back-off correctly
+rate_limits:
+  primary:
+    requests_per_hour: 5000
+    header: X-RateLimit-Remaining
+    reset_header: X-RateLimit-Reset
+  search:
+    requests_per_minute: 30
+
+tools:
+  # ─── Issues ─────────────────────────────────────────────────────────────────
+  - slug: list_issues
+    name: List Issues
+    description: "List issues for a repository. Supports filtering by state, labels, assignee, milestone."
+    risk_level:
+      - READ_ONLY
+    read_only: true
+    destructive: false
+    idempotent: true
+    http:
+      method: GET
+      path: /repos/{owner}/{repo}/issues
+    parameters:
+      - name: owner
+        in: path
+        required: true
+        type: string
+        description: Repository owner (user or organization login)
+      - name: repo
+        in: path
+        required: true
+        type: string
+        description: Repository name
+      - name: state
+        in: query
+        required: false
+        type: string
+        enum: [open, closed, all]
+        default: open
+      - name: labels
+        in: query
+        required: false
+        type: string
+        description: Comma-separated list of label names
+      - name: per_page
+        in: query
+        required: false
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 30
+
+  - slug: get_issue
+    name: Get Issue
+    description: "Get a specific issue by number."
+    risk_level:
+      - READ_ONLY
+    read_only: true
+    destructive: false
+    idempotent: true
+    http:
+      method: GET
+      path: /repos/{owner}/{repo}/issues/{issue_number}
+    parameters:
+      - name: owner
+        in: path
+        required: true
+        type: string
+      - name: repo
+        in: path
+        required: true
+        type: string
+      - name: issue_number
+        in: path
+        required: true
+        type: integer
+
+  - slug: create_issue
+    name: Create Issue
+    description: "Create a new issue in a repository."
+    risk_level:
+      - WRITE
+    read_only: false
+    destructive: false
+    idempotent: false
+    http:
+      method: POST
+      path: /repos/{owner}/{repo}/issues
+      body_schema:
+        type: object
+        required: [title]
+        properties:
+          title:
+            type: string
+            description: Issue title
+          body:
+            type: string
+            description: Issue body (markdown)
+          labels:
+            type: array
+            items:
+              type: string
+          assignees:
+            type: array
+            items:
+              type: string
+          milestone:
+            type: integer
+    parameters:
+      - name: owner
+        in: path
+        required: true
+        type: string
+      - name: repo
+        in: path
+        required: true
+        type: string
+
+  - slug: update_issue
+    name: Update Issue
+    description: "Update an existing issue (title, body, state, labels, assignees)."
+    risk_level:
+      - WRITE
+    read_only: false
+    destructive: false
+    idempotent: true
+    http:
+      method: PATCH
+      path: /repos/{owner}/{repo}/issues/{issue_number}
+      body_schema:
+        type: object
+        properties:
+          title:
+            type: string
+          body:
+            type: string
+          state:
+            type: string
+            enum: [open, closed]
+          labels:
+            type: array
+            items:
+              type: string
+          assignees:
+            type: array
+            items:
+              type: string
+    parameters:
+      - name: owner
+        in: path
+        required: true
+        type: string
+      - name: repo
+        in: path
+        required: true
+        type: string
+      - name: issue_number
+        in: path
+        required: true
+        type: integer
+
+  # ─── Pull Requests ───────────────────────────────────────────────────────────
+  - slug: list_pull_requests
+    name: List Pull Requests
+    description: "List pull requests for a repository."
+    risk_level:
+      - READ_ONLY
+    read_only: true
+    destructive: false
+    idempotent: true
+    http:
+      method: GET
+      path: /repos/{owner}/{repo}/pulls
+    parameters:
+      - name: owner
+        in: path
+        required: true
+        type: string
+      - name: repo
+        in: path
+        required: true
+        type: string
+      - name: state
+        in: query
+        required: false
+        type: string
+        enum: [open, closed, all]
+        default: open
+      - name: base
+        in: query
+        required: false
+        type: string
+        description: Filter by base branch name
+
+  - slug: get_pull_request
+    name: Get Pull Request
+    description: "Get a specific pull request by number."
+    risk_level:
+      - READ_ONLY
+    read_only: true
+    destructive: false
+    idempotent: true
+    http:
+      method: GET
+      path: /repos/{owner}/{repo}/pulls/{pull_number}
+    parameters:
+      - name: owner
+        in: path
+        required: true
+        type: string
+      - name: repo
+        in: path
+        required: true
+        type: string
+      - name: pull_number
+        in: path
+        required: true
+        type: integer
+
+  - slug: create_pull_request
+    name: Create Pull Request
+    description: "Create a pull request."
+    risk_level:
+      - WRITE
+    read_only: false
+    destructive: false
+    idempotent: false
+    http:
+      method: POST
+      path: /repos/{owner}/{repo}/pulls
+      body_schema:
+        type: object
+        required: [title, head, base]
+        properties:
+          title:
+            type: string
+          body:
+            type: string
+          head:
+            type: string
+            description: Branch to merge from
+          base:
+            type: string
+            description: Branch to merge into
+          draft:
+            type: boolean
+            default: false
+    parameters:
+      - name: owner
+        in: path
+        required: true
+        type: string
+      - name: repo
+        in: path
+        required: true
+        type: string
+
+  # ─── Repositories ────────────────────────────────────────────────────────────
+  - slug: list_repositories
+    name: List Repositories
+    description: "List repositories for an authenticated user or organization."
+    risk_level:
+      - READ_ONLY
+    read_only: true
+    destructive: false
+    idempotent: true
+    http:
+      method: GET
+      path: /user/repos
+    parameters:
+      - name: type
+        in: query
+        required: false
+        type: string
+        enum: [all, owner, public, private, member]
+        default: owner
+      - name: sort
+        in: query
+        required: false
+        type: string
+        enum: [created, updated, pushed, full_name]
+        default: updated
+      - name: per_page
+        in: query
+        required: false
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 30
+
+  - slug: get_repository
+    name: Get Repository
+    description: "Get a specific repository."
+    risk_level:
+      - READ_ONLY
+    read_only: true
+    destructive: false
+    idempotent: true
+    http:
+      method: GET
+      path: /repos/{owner}/{repo}
+    parameters:
+      - name: owner
+        in: path
+        required: true
+        type: string
+      - name: repo
+        in: path
+        required: true
+        type: string
+
+  # ─── Comments ────────────────────────────────────────────────────────────────
+  - slug: create_issue_comment
+    name: Create Issue Comment
+    description: "Add a comment to an issue or pull request."
+    risk_level:
+      - WRITE
+      - EXTERNAL_COMMUNICATION
+    read_only: false
+    destructive: false
+    idempotent: false
+    http:
+      method: POST
+      path: /repos/{owner}/{repo}/issues/{issue_number}/comments
+      body_schema:
+        type: object
+        required: [body]
+        properties:
+          body:
+            type: string
+            description: Comment body (markdown)
+    parameters:
+      - name: owner
+        in: path
+        required: true
+        type: string
+      - name: repo
+        in: path
+        required: true
+        type: string
+      - name: issue_number
+        in: path
+        required: true
+        type: integer
+
+# ─── Webhooks (trigger support) ───────────────────────────────────────────────
+triggers:
+  - event_type: issues.opened
+    description: Fires when an issue is opened
+    payload_schema:
+      type: object
+      properties:
+        action: { type: string, enum: [opened] }
+        issue: { type: object }
+        repository: { type: object }
+
+  - event_type: pull_request.opened
+    description: Fires when a PR is opened
+    payload_schema:
+      type: object
+      properties:
+        action: { type: string, enum: [opened] }
+        pull_request: { type: object }
+        repository: { type: object }
+
+  - event_type: push
+    description: Fires when commits are pushed to a branch
+    payload_schema:
+      type: object
+      properties:
+        ref: { type: string }
+        commits: { type: array }
+        repository: { type: object }

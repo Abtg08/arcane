@@ -1,0 +1,15 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "composite": true
+  },
+  "references": [
+    { "path": "../config" },
+    { "path": "../core" },
+    { "path": "../schemas" },
+    { "path": "../telemetry" }
+  ],
+  "include": ["src/**/*"]
+}

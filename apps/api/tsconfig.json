@@ -1,0 +1,19 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "composite": true
+  },
+  "references": [
+    { "path": "../../packages/auth" },
+    { "path": "../../packages/config" },
+    { "path": "../../packages/connector-runtime" },
+    { "path": "../../packages/core" },
+    { "path": "../../packages/policy" },
+    { "path": "../../packages/schemas" },
+    { "path": "../../packages/search" },
+    { "path": "../../packages/telemetry" }
+  ],
+  "include": ["src/**/*"]
+}

@@ -1,0 +1,32 @@
+{
+  "name": "@arcane/auth",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@arcane/config": "workspace:*",
+    "@arcane/core": "workspace:*",
+    "@arcane/schemas": "workspace:*",
+    "@arcane/telemetry": "workspace:*",
+    "jsonwebtoken": "^9.0.2",
+    "ioredis": "^5.4.1"
+  },
+  "devDependencies": {
+    "@types/jsonwebtoken": "^9.0.6",
+    "typescript": "^5.5.4",
+    "vitest": "^2.0.5"
+  }
+}

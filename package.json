@@ -1,0 +1,36 @@
+{
+  "name": "arcane",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Capability execution layer for AI agents",
+  "engines": {
+    "node": ">=22.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "scripts": {
+    "build": "pnpm -r build",
+    "dev": "pnpm -r --parallel dev",
+    "lint": "pnpm -r lint",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test",
+    "test:unit": "pnpm -r test:unit",
+    "test:integration": "pnpm -r test:integration",
+    "test:security": "pnpm -r test:security",
+    "format": "prettier --write \"**/*.{ts,tsx,js,json,yaml,yml,md}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,json,yaml,yml,md}\"",
+    "db:migrate": "node --import tsx/esm packages/core/src/db/migrate.ts",
+    "db:migrate:create": "node -e \"require('fs').writeFileSync('migrations/' + String(Date.now()) + '_' + process.argv[1] + '.sql', '-- Migration: ' + process.argv[1])\"",
+    "infra:up": "docker compose -f infra/docker/docker-compose.dev.yml up -d",
+    "infra:down": "docker compose -f infra/docker/docker-compose.dev.yml down",
+    "infra:logs": "docker compose -f infra/docker/docker-compose.dev.yml logs -f"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "prettier": "^3.3.3",
+    "typescript": "^5.5.4",
+    "eslint": "^9.9.0",
+    "@typescript-eslint/eslint-plugin": "^8.3.0",
+    "@typescript-eslint/parser": "^8.3.0",
+    "eslint-config-prettier": "^9.1.0"
+  }
+}

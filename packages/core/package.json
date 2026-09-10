@@ -1,0 +1,32 @@
+{
+  "name": "@arcane/core",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "db:migrate": "node --import tsx/esm src/db/migrate.ts"
+  },
+  "dependencies": {
+    "@arcane/config": "workspace:*",
+    "@arcane/schemas": "workspace:*",
+    "pg": "^8.12.0",
+    "uuidv7": "^1.0.2",
+    "tsx": "^4.17.0"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.11.6",
+    "typescript": "^5.5.4",
+    "vitest": "^2.0.5"
+  }
+}
