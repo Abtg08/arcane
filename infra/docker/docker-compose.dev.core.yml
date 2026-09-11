@@ -1,0 +1,89 @@
+# Arcane — Core dev services only (no observability stack)
+# Use when pulling the full stack fails or is slow.
+# Run: pnpm infra:core
+#
+# Includes: postgres, valkey, nats, minio
+# Excludes: otel-collector, tempo, loki, prometheus, grafana
+
+name: arcane-dev
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: arcane-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: arcane
+      POSTGRES_PASSWORD: arcane_dev_secret
+      POSTGRES_DB: arcane
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init/postgres:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U arcane -d arcane']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  valkey:
+    image: valkey/valkey:7.2-alpine
+    container_name: arcane-valkey
+    restart: unless-stopped
+    command: valkey-server --save "" --appendonly no --maxmemory 256mb --maxmemory-policy allkeys-lru
+    ports:
+      - '6379:6379'
+    healthcheck:
+      test: ['CMD', 'valkey-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  nats:
+    image: nats:2.10-alpine
+    container_name: arcane-nats
+    restart: unless-stopped
+    command: >
+      -js
+      -m 8222
+      -n arcane-nats
+      --store_dir /data/jetstream
+    ports:
+      - '4222:4222'
+      - '8222:8222'
+    volumes:
+      - nats_data:/data/jetstream
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -q --spider http://localhost:8222/healthz || exit 1']
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  minio:
+    image: quay.io/minio/minio:latest
+    container_name: arcane-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: arcane_minio
+      MINIO_ROOT_PASSWORD: arcane_minio_secret
+    ports:
+      - '9000:9000'
+      - '9001:9001'
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ['CMD-SHELL', 'mc ready local || exit 1']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
+  nats_data:
+  minio_data:
+
+networks:
+  default:
+    name: arcane-dev
