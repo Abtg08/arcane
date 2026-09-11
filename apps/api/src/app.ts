@@ -125,6 +125,7 @@ export async function buildApp(
   await app.register(import('./routes/connections.js'), { config });
   await app.register(import('./routes/tools.js'), { config });
   await app.register(import('./routes/executions.js'), { config });
+  await app.register(import('./routes/search.js'), { config });
 
   // TODO Phase 2+:
   // await app.register(import('./routes/policies.js'));
