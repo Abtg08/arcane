@@ -3,3 +3,7 @@ packages:
   - 'packages/*'
   - 'connectors/*'
   - 'services/*'
+allowBuilds:
+  esbuild: false
+  protobufjs: false
+  unrs-resolver: false
