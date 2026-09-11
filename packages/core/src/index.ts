@@ -7,3 +7,4 @@
 export * from './db/index.js';
 export * from './errors/index.js';
 export * from './repositories/index.js';
+export * from './secrets/index.js';
