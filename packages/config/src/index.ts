@@ -9,11 +9,6 @@ import { z } from 'zod';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-const port = (): z.ZodEffects<z.ZodString, number, string> =>
-  z
-    .string()
-    .regex(/^\d+$/, 'Must be a numeric port')
-    .transform((v) => parseInt(v, 10));
 
 const url = (): z.ZodString => z.string().url();
 
@@ -82,6 +77,32 @@ export const ApiConfigSchema = BaseConfigSchema.extend({
 });
 
 export type ApiConfig = z.infer<typeof ApiConfigSchema>;
+
+// ─── Connector Runtime config ──────────────────────────────────────────────────
+
+export const ConnectorRuntimeConfigSchema = BaseConfigSchema.extend({
+  OTEL_SERVICE_NAME: z.string().default('arcane-connector-runtime'),
+
+  // NATS subjects
+  NATS_SUBJECT_EXECUTE: z.string().default('executions.run'),
+  NATS_SUBJECT_RESULT: z.string().default('executions.result'),
+  NATS_CONSUMER_GROUP: z.string().default('connector-runtime'),
+
+  // HTTP execution limits
+  HTTP_TIMEOUT_MS: z.string().default('30000').transform(Number),
+  HTTP_MAX_RESPONSE_BYTES: z.string().default('10485760').transform(Number), // 10MB
+
+  // SSRF protection: comma-separated CIDR blocks to block (SI-08)
+  SSRF_BLOCKED_CIDRS: z
+    .string()
+    .default('10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,127.0.0.0/8,::1/128,fc00::/7')
+    .transform((v) => v.split(',')),
+
+  // Execution concurrency
+  MAX_CONCURRENT_EXECUTIONS: z.string().default('50').transform(Number),
+});
+
+export type ConnectorRuntimeConfig = z.infer<typeof ConnectorRuntimeConfigSchema>;
 
 // ─── MCP Gateway config ────────────────────────────────────────────────────────
 
