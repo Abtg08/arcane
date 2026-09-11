@@ -24,6 +24,7 @@
 import type { FastifyInstance } from 'fastify';
 import { getPool, generateId } from '@arcane/core';
 import { NotFoundError, ForbiddenError, PolicyDeniedError, PolicyRequiresConfirmationError } from '@arcane/core';
+import { evaluatePolicy } from '@arcane/policy';
 import type { ApiConfig } from '@arcane/config';
 import type { UUIDv7 } from '@arcane/schemas';
 
@@ -152,11 +153,17 @@ export default async function executionRoutes(
       // ── Step 3: POLICY CHECK (SI-04 — BEFORE credential resolution) ─────────────
       const toolSlugFull = `${body.toolkit_slug}.${body.tool_slug}`;
 
-      // TODO Phase 2: evaluate all active policies for this environment
-      // For now, implicit ALLOW (policy engine wired in Phase 2)
-      // Cast prevents TS from narrowing the literal to 'ALLOW' — Phase 2 will replace this entirely
-      const policyDecision = 'ALLOW' as 'ALLOW' | 'DENY' | 'REQUIRE_CONFIRMATION';
-      const policyReason: string | null = null;
+      // Evaluate all active policies for this environment (Phase 2-A)
+      const policyResult = await evaluatePolicy(db, {
+        environment_id: environmentId,
+        tool_slug: body.tool_slug,
+        toolkit_slug: body.toolkit_slug,
+        connection_id: body.connection_id,
+        input: body.input,
+        session_id: body.session_id,
+      });
+      const policyDecision = policyResult.decision;
+      const policyReason = policyResult.reason;
 
       if (policyDecision === 'DENY') {
         // Write failed audit event immediately — credentials never loaded
