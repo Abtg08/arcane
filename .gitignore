@@ -38,4 +38,3 @@ infra/docker/volumes/
 *.key
 *.p12
 *.pfx
-secrets/
