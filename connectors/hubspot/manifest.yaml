@@ -1,0 +1,25 @@
+id: hubspot
+slug: hubspot
+name: HubSpot
+description: Manage contacts, deals, and companies in HubSpot CRM.
+version: "1.0.0"
+category: crm
+icon_url: https://cdn.arcane.dev/connectors/hubspot/icon.svg
+
+auth:
+  type: oauth2
+  oauth2:
+    authorization_url: https://app.hubspot.com/oauth/authorize
+    token_url: https://api.hubapi.com/oauth/v1/token
+    scopes:
+      - crm.objects.contacts.read
+      - crm.objects.contacts.write
+      - crm.objects.deals.read
+      - crm.objects.companies.read
+    pkce: false
+    refresh_supported: true
+  connect_hint: Connect your HubSpot account to manage CRM data.
+
+base_url: https://api.hubapi.com
+default_headers:
+  Content-Type: application/json

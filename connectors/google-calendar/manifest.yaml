@@ -1,0 +1,77 @@
+id: google-calendar
+slug: google-calendar
+name: Google Calendar
+description: >
+  Manage calendar events, check availability, and schedule meetings.
+  Powers AI agents to handle scheduling workflows.
+version: "1.0.0"
+category: productivity
+icon_url: https://cdn.arcane.dev/connectors/google-calendar/icon.svg
+
+auth:
+  type: oauth2
+  oauth2:
+    authorization_url: https://accounts.google.com/o/oauth2/v2/auth
+    token_url: https://oauth2.googleapis.com/token
+    scopes:
+      - https://www.googleapis.com/auth/calendar.readonly
+      - https://www.googleapis.com/auth/calendar.events
+    pkce: true
+    refresh_supported: true
+  connect_hint: >
+    You'll be redirected to Google to authorize Arcane to access Google Calendar.
+
+base_url: https://www.googleapis.com/calendar/v3
+default_headers:
+  Content-Type: application/json
+
+tools:
+  - slug: list_calendars
+    name: List Calendars
+    risk_level: [READ_ONLY]
+    read_only: true
+    destructive: false
+    idempotent: true
+    http:
+      method: GET
+      path: /users/me/calendarList
+
+  - slug: list_events
+    name: List Events
+    risk_level: [READ_ONLY]
+    read_only: true
+    destructive: false
+    idempotent: true
+    http:
+      method: GET
+      path: /calendars/{calendarId}/events
+
+  - slug: create_event
+    name: Create Event
+    risk_level: [WRITE]
+    read_only: false
+    destructive: false
+    idempotent: false
+    http:
+      method: POST
+      path: /calendars/{calendarId}/events
+
+  - slug: update_event
+    name: Update Event
+    risk_level: [WRITE]
+    read_only: false
+    destructive: false
+    idempotent: true
+    http:
+      method: PATCH
+      path: /calendars/{calendarId}/events/{eventId}
+
+  - slug: delete_event
+    name: Delete Event
+    risk_level: [WRITE]
+    read_only: false
+    destructive: true
+    idempotent: true
+    http:
+      method: DELETE
+      path: /calendars/{calendarId}/events/{eventId}

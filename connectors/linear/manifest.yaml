@@ -1,0 +1,26 @@
+id: linear
+slug: linear
+name: Linear
+description: >
+  Manage issues, projects, and teams in Linear.
+  Uses GraphQL API for all operations.
+version: "1.0.0"
+category: developer-tools
+icon_url: https://cdn.arcane.dev/connectors/linear/icon.svg
+
+auth:
+  type: oauth2
+  oauth2:
+    authorization_url: https://linear.app/oauth/authorize
+    token_url: https://api.linear.app/oauth/token
+    scopes:
+      - read
+      - write
+      - issues:create
+    pkce: true
+    refresh_supported: false
+  connect_hint: Connect your Linear workspace to manage issues and projects.
+
+base_url: https://api.linear.app
+default_headers:
+  Content-Type: application/json

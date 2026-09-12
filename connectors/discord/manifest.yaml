@@ -1,0 +1,158 @@
+id: discord
+slug: discord
+name: Discord
+description: >
+  Manage Discord servers, channels, and messages. Powers AI agents
+  to communicate and moderate Discord communities.
+version: "1.0.0"
+category: communication
+icon_url: https://cdn.arcane.dev/connectors/discord/icon.svg
+
+auth:
+  type: oauth2
+  oauth2:
+    authorization_url: https://discord.com/api/oauth2/authorize
+    token_url: https://discord.com/api/oauth2/token
+    scopes:
+      - identify
+      - guilds
+      - guilds.members.read
+      - messages.read
+      - bot
+    pkce: true
+    refresh_supported: true
+  connect_hint: >
+    You'll be redirected to Discord to authorize Arcane.
+
+base_url: https://discord.com/api/v10
+default_headers:
+  Content-Type: application/json
+
+rate_limits:
+  primary:
+    requests_per_second: 50
+
+tools:
+  - slug: list_guilds
+    name: List Guilds
+    description: "List Discord guilds (servers) the bot is a member of."
+    risk_level: [READ_ONLY]
+    read_only: true
+    destructive: false
+    idempotent: true
+    http:
+      method: GET
+      path: /users/@me/guilds
+    parameters:
+      - name: limit
+        in: query
+        required: false
+        type: integer
+        minimum: 1
+        maximum: 200
+        default: 100
+
+  - slug: get_guild
+    name: Get Guild
+    description: "Get information about a specific Discord guild."
+    risk_level: [READ_ONLY]
+    read_only: true
+    destructive: false
+    idempotent: true
+    http:
+      method: GET
+      path: /guilds/{guild_id}
+    parameters:
+      - name: guild_id
+        in: path
+        required: true
+        type: string
+
+  - slug: list_channels
+    name: List Channels
+    description: "List channels in a Discord guild."
+    risk_level: [READ_ONLY]
+    read_only: true
+    destructive: false
+    idempotent: true
+    http:
+      method: GET
+      path: /guilds/{guild_id}/channels
+    parameters:
+      - name: guild_id
+        in: path
+        required: true
+        type: string
+
+  - slug: get_channel_messages
+    name: Get Channel Messages
+    description: "Get messages from a Discord channel."
+    risk_level: [READ_ONLY]
+    read_only: true
+    destructive: false
+    idempotent: true
+    http:
+      method: GET
+      path: /channels/{channel_id}/messages
+    parameters:
+      - name: channel_id
+        in: path
+        required: true
+        type: string
+      - name: limit
+        in: query
+        required: false
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 50
+
+  - slug: send_message
+    name: Send Message
+    description: "Send a message to a Discord channel."
+    risk_level: [WRITE, EXTERNAL_COMMUNICATION]
+    read_only: false
+    destructive: false
+    idempotent: false
+    http:
+      method: POST
+      path: /channels/{channel_id}/messages
+      body_schema:
+        type: object
+        required: [content]
+        properties:
+          content:
+            type: string
+            description: Message content (max 2000 chars)
+    parameters:
+      - name: channel_id
+        in: path
+        required: true
+        type: string
+      - name: content
+        in: body
+        required: true
+        type: string
+
+  - slug: list_guild_members
+    name: List Guild Members
+    description: "List members of a Discord guild."
+    risk_level: [READ_ONLY]
+    read_only: true
+    destructive: false
+    idempotent: true
+    http:
+      method: GET
+      path: /guilds/{guild_id}/members
+    parameters:
+      - name: guild_id
+        in: path
+        required: true
+        type: string
+      - name: limit
+        in: query
+        required: false
+        type: integer
+        minimum: 1
+        maximum: 1000
+        default: 100

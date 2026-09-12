@@ -1,0 +1,197 @@
+id: gmail
+slug: gmail
+name: Gmail
+description: >
+  Read, send, and manage Gmail messages and threads.
+  Powers AI agents to handle email workflows.
+version: "1.0.0"
+category: communication
+icon_url: https://cdn.arcane.dev/connectors/gmail/icon.svg
+
+auth:
+  type: oauth2
+  oauth2:
+    authorization_url: https://accounts.google.com/o/oauth2/v2/auth
+    token_url: https://oauth2.googleapis.com/token
+    scopes:
+      - https://www.googleapis.com/auth/gmail.readonly
+      - https://www.googleapis.com/auth/gmail.send
+      - https://www.googleapis.com/auth/gmail.modify
+    pkce: true
+    refresh_supported: true
+  connect_hint: >
+    You'll be redirected to Google to authorize Arcane to access Gmail.
+
+base_url: https://gmail.googleapis.com
+default_headers:
+  Content-Type: application/json
+
+rate_limits:
+  primary:
+    requests_per_day: 1000000000
+
+tools:
+  - slug: list_messages
+    name: List Messages
+    description: "List email messages in the user's mailbox."
+    risk_level: [READ_ONLY]
+    read_only: true
+    destructive: false
+    idempotent: true
+    http:
+      method: GET
+      path: /gmail/v1/users/me/messages
+    parameters:
+      - name: q
+        in: query
+        required: false
+        type: string
+        description: Gmail search query (e.g. "from:user@example.com")
+      - name: maxResults
+        in: query
+        required: false
+        type: integer
+        minimum: 1
+        maximum: 500
+        default: 100
+      - name: labelIds
+        in: query
+        required: false
+        type: string
+        description: Label ID to filter by
+
+  - slug: get_message
+    name: Get Message
+    description: "Get a specific email message by ID."
+    risk_level: [READ_ONLY]
+    read_only: true
+    destructive: false
+    idempotent: true
+    http:
+      method: GET
+      path: /gmail/v1/users/me/messages/{id}
+    parameters:
+      - name: id
+        in: path
+        required: true
+        type: string
+      - name: format
+        in: query
+        required: false
+        type: string
+        enum: [full, metadata, raw, minimal]
+        default: full
+
+  - slug: send_message
+    name: Send Message
+    description: "Send an email message."
+    risk_level: [WRITE, EXTERNAL_COMMUNICATION]
+    read_only: false
+    destructive: false
+    idempotent: false
+    http:
+      method: POST
+      path: /gmail/v1/users/me/messages/send
+      body_schema:
+        type: object
+        required: [raw]
+        properties:
+          raw:
+            type: string
+            description: Base64url-encoded RFC 2822 message
+    parameters:
+      - name: raw
+        in: body
+        required: true
+        type: string
+        description: Base64url-encoded RFC 2822 message
+
+  - slug: list_threads
+    name: List Threads
+    description: "List email threads in the user's mailbox."
+    risk_level: [READ_ONLY]
+    read_only: true
+    destructive: false
+    idempotent: true
+    http:
+      method: GET
+      path: /gmail/v1/users/me/threads
+    parameters:
+      - name: q
+        in: query
+        required: false
+        type: string
+      - name: maxResults
+        in: query
+        required: false
+        type: integer
+        minimum: 1
+        maximum: 500
+        default: 100
+
+  - slug: get_thread
+    name: Get Thread
+    description: "Get a specific email thread."
+    risk_level: [READ_ONLY]
+    read_only: true
+    destructive: false
+    idempotent: true
+    http:
+      method: GET
+      path: /gmail/v1/users/me/threads/{id}
+    parameters:
+      - name: id
+        in: path
+        required: true
+        type: string
+
+  - slug: list_labels
+    name: List Labels
+    description: "List all Gmail labels."
+    risk_level: [READ_ONLY]
+    read_only: true
+    destructive: false
+    idempotent: true
+    http:
+      method: GET
+      path: /gmail/v1/users/me/labels
+    parameters: []
+
+  - slug: modify_message
+    name: Modify Message
+    description: "Add or remove labels from a message."
+    risk_level: [WRITE]
+    read_only: false
+    destructive: false
+    idempotent: true
+    http:
+      method: POST
+      path: /gmail/v1/users/me/messages/{id}/modify
+      body_schema:
+        type: object
+        properties:
+          addLabelIds:
+            type: array
+            items:
+              type: string
+          removeLabelIds:
+            type: array
+            items:
+              type: string
+    parameters:
+      - name: id
+        in: path
+        required: true
+        type: string
+      - name: addLabelIds
+        in: body
+        required: false
+        type: array
+        items:
+          type: string
+      - name: removeLabelIds
+        in: body
+        required: false
+        type: array
+        items:
+          type: string

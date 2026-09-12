@@ -58,7 +58,20 @@ export interface OAuth2AuthDef {
   connect_hint?: string | undefined;
 }
 
-export type AuthDef = OAuth2AuthDef; // Extend as needed
+export interface ApiKeyAuthDef {
+  type: 'api_key';
+  api_key: {
+    /** HTTP header name (e.g. Authorization, X-API-Key) */
+    header: string;
+    /** Optional scheme prefix for Authorization header (e.g. Bearer, Basic) */
+    scheme?: string | undefined;
+    /** Environment variable name that holds the key */
+    env_var: string;
+  };
+  connect_hint?: string | undefined;
+}
+
+export type AuthDef = OAuth2AuthDef | ApiKeyAuthDef; // Extend as needed
 
 export interface ConnectorDef {
   id: string;

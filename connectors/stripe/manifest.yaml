@@ -1,0 +1,14 @@
+id: stripe
+slug: stripe
+name: Stripe
+description: Manage customers, payments, subscriptions, and payment intents in Stripe.
+version: 1.0.0
+category: payments
+base_url: "https://api.stripe.com/v1"
+auth:
+  type: api_key
+  api_key:
+    header: Authorization
+    scheme: Bearer
+    env_var: STRIPE_SECRET_KEY
+  connect_hint: "Enter your Stripe secret key (sk_live_... or sk_test_...) to connect your Stripe account."
