@@ -16,11 +16,9 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run"
   },
-  "dependencies": {
-    "@arcane/schemas": "workspace:*",
-    "zod": "^3.23.8"
-  },
+  "dependencies": {},
   "devDependencies": {
+    "@types/node": "^22.0.0",
     "typescript": "^5.5.4",
     "vitest": "^2.0.5"
   },

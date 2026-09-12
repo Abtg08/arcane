@@ -5,6 +5,16 @@
  * Errors are thrown as ApiError instances so React Query can handle them uniformly.
  */
 
+import type {
+  Execution,
+  PageResult,
+  Toolkit,
+  Tool,
+  Connection,
+  Trigger,
+  AuditEvent,
+} from '@/types/api';
+
 export class ApiError extends Error {
   public readonly code: string;
   public readonly status: number;
@@ -21,16 +31,27 @@ export class ApiError extends Error {
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 
+function getApiKey(): string | null {
+  if (typeof window === 'undefined') return null;
+  return localStorage.getItem('arcane_api_key');
+}
+
 async function request<T>(
   path: string,
   init: RequestInit = {},
 ): Promise<T> {
+  const apiKey = getApiKey();
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...(init.headers as Record<string, string> | undefined),
+  };
+  if (apiKey) {
+    headers['x-api-key'] = apiKey;
+  }
+
   const res = await fetch(`${API_BASE}${path}`, {
     ...init,
-    headers: {
-      'Content-Type': 'application/json',
-      ...init.headers,
-    },
+    headers,
   });
 
   if (!res.ok) {
@@ -55,26 +76,68 @@ async function request<T>(
   return res.json() as Promise<T>;
 }
 
-// ─── API methods — typed wrappers ──────────────────────────────────────────────
+// ─── Executions ────────────────────────────────────────────────────────────────
 
-export const api = {
-  get: <T>(path: string, headers?: HeadersInit) =>
-    request<T>(path, { method: 'GET', headers }),
+export const executionsApi = {
+  list: (params?: { limit?: number; cursor?: string; status?: string }) => {
+    const qs = new URLSearchParams();
+    if (params?.limit) qs.set('limit', String(params.limit));
+    if (params?.cursor) qs.set('cursor', params.cursor);
+    if (params?.status) qs.set('status', params.status);
+    const query = qs.toString();
+    return request<PageResult<Execution>>(`/executions${query ? `?${query}` : ''}`);
+  },
 
-  post: <T>(path: string, body: unknown, headers?: HeadersInit) =>
-    request<T>(path, {
-      method: 'POST',
-      body: JSON.stringify(body),
-      headers,
-    }),
+  get: (id: string) =>
+    request<Execution>(`/executions/${id}`),
 
-  patch: <T>(path: string, body: unknown, headers?: HeadersInit) =>
-    request<T>(path, {
-      method: 'PATCH',
-      body: JSON.stringify(body),
-      headers,
-    }),
+  getAuditEvents: (executionId: string) =>
+    request<{ data: AuditEvent[] }>(`/executions/${executionId}/audit`),
+};
 
-  delete: <T>(path: string, headers?: HeadersInit) =>
-    request<T>(path, { method: 'DELETE', headers }),
+// ─── Toolkits ──────────────────────────────────────────────────────────────────
+
+export const toolkitsApi = {
+  list: (params?: { q?: string; limit?: number; cursor?: string }) => {
+    const qs = new URLSearchParams();
+    if (params?.q) qs.set('q', params.q);
+    if (params?.limit) qs.set('limit', String(params.limit));
+    if (params?.cursor) qs.set('cursor', params.cursor);
+    const query = qs.toString();
+    return request<PageResult<Toolkit>>(`/toolkits${query ? `?${query}` : ''}`);
+  },
+
+  getTools: (slug: string, params?: { limit?: number }) => {
+    const qs = new URLSearchParams();
+    if (params?.limit) qs.set('limit', String(params.limit));
+    const query = qs.toString();
+    return request<PageResult<Tool>>(`/toolkits/${slug}/tools${query ? `?${query}` : ''}`);
+  },
+
+  getTool: (toolkit: string, tool: string) =>
+    request<Tool>(`/toolkits/${toolkit}/tools/${tool}`),
+};
+
+// ─── Connections ───────────────────────────────────────────────────────────────
+
+export const connectionsApi = {
+  list: (params?: { limit?: number; cursor?: string }) => {
+    const qs = new URLSearchParams();
+    if (params?.limit) qs.set('limit', String(params.limit));
+    if (params?.cursor) qs.set('cursor', params.cursor);
+    const query = qs.toString();
+    return request<PageResult<Connection>>(`/connections${query ? `?${query}` : ''}`);
+  },
+};
+
+// ─── Triggers ──────────────────────────────────────────────────────────────────
+
+export const triggersApi = {
+  list: (params?: { limit?: number; status?: string }) => {
+    const qs = new URLSearchParams();
+    if (params?.limit) qs.set('limit', String(params.limit));
+    if (params?.status) qs.set('status', params.status);
+    const query = qs.toString();
+    return request<PageResult<Trigger>>(`/triggers${query ? `?${query}` : ''}`);
+  },
 };

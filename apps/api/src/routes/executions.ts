@@ -27,9 +27,12 @@ import { NotFoundError, ForbiddenError, PolicyDeniedError, PolicyRequiresConfirm
 import { evaluatePolicy } from '@arcane/policy';
 import type { ApiConfig } from '@arcane/config';
 import type { UUIDv7 } from '@arcane/schemas';
+import type { JetStreamClient } from 'nats';
+import { SUBJECT_EXECUTIONS_RUN, encode, type ExecuteJobMessage } from '@arcane/nats-client';
 
 interface ExecutionRouteContext {
   config: ApiConfig;
+  js?: JetStreamClient; // optional: present when NATS is connected (Phase 5+)
 }
 
 // Execution state machine values
@@ -45,8 +48,9 @@ type ExecutionStatus =
 
 export default async function executionRoutes(
   fastify: FastifyInstance,
-  _opts: ExecutionRouteContext,
+  opts: ExecutionRouteContext,
 ): Promise<void> {
+  const { js } = opts;
   // ─── POST /execute — run a tool ────────────────────────────────────────────────
 
   fastify.post(
@@ -226,19 +230,21 @@ export default async function executionRoutes(
 
       // ── Step 6: Publish NATS job → connector-runtime ─────────────────────────────
       // connector-runtime is the ONLY component that resolves credentials (SI-02)
-      // It will: load secret_reference → call KMS → decrypt → execute → encrypt response
-      //
-      // TODO Phase 3: publish to NATS JetStream
-      // const nc = getNatsConnection();
-      // await nc.publish('executions.run', codec.encode({
-      //   execution_id: executionId,
-      //   tool_version_id: toolVersion.tool_version_id,
-      //   connection_id: body.connection_id,
-      //   input: body.input,  // SI-01: No credentials here
-      // }));
+      // SI-01: input payload never contains credentials — only tool inputs
+      if (js) {
+        const job: ExecuteJobMessage = {
+          execution_id: executionId,
+          environment_id: environmentId,
+          tool_version_id: toolVersion.tool_version_id,
+          connection_id: body.connection_id,
+          input: body.input, // SI-01: no credentials here
+          request_id: (req.id as string) ?? generateId(),
+          trace_id: generateId(),
+        };
+        await js.publish(SUBJECT_EXECUTIONS_RUN, encode(job));
+      }
+      // If NATS not connected (test/dev), execution stays in AUTHORIZING until worker picks it up
 
-      // For Phase 1-C, return EXECUTING status synchronously
-      // Phase 3 will add NATS publish + result streaming
       return reply.status(202).send({
         execution_id: executionId,
         status: 'AUTHORIZING',

@@ -15,9 +15,11 @@ import { Redis } from 'ioredis';
 import { authMiddleware } from '@arcane/auth';
 import type { DbPool } from '@arcane/core';
 import type { ApiConfig } from '@arcane/config';
+import type { JetStreamClient } from 'nats';
 
 export interface AppDependencies {
   db: DbPool;
+  js?: JetStreamClient; // optional: absent in test / pre-NATS startup
 }
 
 export async function buildApp(
@@ -25,7 +27,7 @@ export async function buildApp(
   logger: FastifyBaseLogger,
   deps: AppDependencies,
 ): Promise<FastifyInstance> {
-  const { db } = deps;
+  const { db, js } = deps;
   const app = Fastify({
     logger,
     genReqId: () => crypto.randomUUID(),
@@ -124,12 +126,13 @@ export async function buildApp(
   await app.register(import('./routes/sessions.js'), { config });
   await app.register(import('./routes/connections.js'), { config });
   await app.register(import('./routes/tools.js'), { config });
-  await app.register(import('./routes/executions.js'), { config });
+  await app.register(import('./routes/executions.js'), { config, ...(js ? { js } : {}) });
   await app.register(import('./routes/search.js'), { config });
+
+  await app.register(import('./routes/triggers.js'), { config });
 
   // TODO Phase 2+:
   // await app.register(import('./routes/policies.js'));
-  // await app.register(import('./routes/triggers.js'));
   // await app.register(import('./routes/admin.js'));
 
   // ─── Global error handler ─────────────────────────────────────────────────────

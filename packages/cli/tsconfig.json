@@ -6,8 +6,7 @@
     "composite": true
   },
   "references": [
-    { "path": "../config" },
-    { "path": "../schemas" }
+    { "path": "../sdk-ts" }
   ],
   "include": ["src/**/*"]
 }

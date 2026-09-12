@@ -18,9 +18,9 @@
     "test:security": "pnpm -r test:security",
     "format": "prettier --write \"**/*.{ts,tsx,js,json,yaml,yml,md}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,json,yaml,yml,md}\"",
-    "db:migrate": "node --env-file-if-exists=.env --import tsx packages/core/src/db/migrate.ts",
+    "db:migrate": "tsx packages/core/src/db/migrate.ts",
     "db:migrate:create": "node -e \"require('fs').writeFileSync('migrations/' + String(Date.now()) + '_' + process.argv[1] + '.sql', '-- Migration: ' + process.argv[1])\"",
-    "db:seed": "node --env-file-if-exists=.env --import tsx scripts/seed.ts",
+    "db:seed": "tsx scripts/seed.ts",
     "db:reset": "pnpm db:migrate && pnpm db:seed",
     "infra:up": "docker compose -f infra/docker/docker-compose.dev.yml up -d",
     "infra:down": "docker compose -f infra/docker/docker-compose.dev.yml down",
@@ -28,12 +28,8 @@
     "infra:core": "docker compose -f infra/docker/docker-compose.dev.core.yml up -d",
     "infra:core:down": "docker compose -f infra/docker/docker-compose.dev.core.yml down"
   },
-  "dependencies": {
-    "pg": "^8.12.0"
-  },
   "devDependencies": {
     "@types/node": "^22.0.0",
-    "@types/pg": "^8.11.6",
     "prettier": "^3.3.3",
     "tsx": "^4.19.0",
     "typescript": "^5.5.4",

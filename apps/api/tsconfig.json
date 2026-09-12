@@ -10,6 +10,7 @@
     { "path": "../../packages/config" },
     { "path": "../../packages/connector-runtime" },
     { "path": "../../packages/core" },
+    { "path": "../../packages/nats-client" },
     { "path": "../../packages/policy" },
     { "path": "../../packages/schemas" },
     { "path": "../../packages/search" },
