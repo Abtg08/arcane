@@ -111,6 +111,9 @@ export const McpConfigSchema = BaseConfigSchema.extend({
   PORT: z.string().default('3002').transform(Number),
   HOST: z.string().default('0.0.0.0'),
 
+  // Session token verification — must match the API's JWT_SECRET
+  JWT_SECRET: requiredString(),
+
   // Delegates execution to the API — NEVER calls providers directly
   EXECUTION_GATEWAY_URL: url().default('http://localhost:3001'),
 });

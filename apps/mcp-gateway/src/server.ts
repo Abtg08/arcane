@@ -1,43 +1,56 @@
 /**
- * Arcane MCP Gateway — entry point.
+ * Arcane MCP Gateway — server entry point.
  *
- * The MCP gateway exposes Arcane tools over the Model Context Protocol.
- * It delegates ALL execution to the API service — it NEVER resolves
- * credentials or calls external providers directly.
+ * Exposes the Model Context Protocol (Streamable HTTP transport) on /mcp.
+ * Delegates ALL execution to the Execution Gateway (API service).
  *
- * SECURITY INVARIANT: mcp-gateway has no DB connection and no KMS access.
- * It is a thin protocol adapter between MCP clients and the API.
+ * SI-09: This process has NO database connection and NO KMS access.
+ *        It is a thin protocol adapter. Credentials never enter this process.
  */
 
+import Fastify from 'fastify';
 import { initOtel, initLogger, shutdownOtel } from '@arcane/telemetry';
 import { loadConfig, McpConfigSchema } from '@arcane/config';
+import { registerMcpRoutes } from './handler.js';
 
 const config = loadConfig(McpConfigSchema, process.env);
 
 initOtel({
-  serviceName: 'arcane-mcp-gateway',
+  serviceName: config.OTEL_SERVICE_NAME,
   otlpEndpoint: config.OTEL_EXPORTER_OTLP_ENDPOINT,
   environment: config.NODE_ENV,
 });
 
 const log = initLogger({
-  serviceName: 'arcane-mcp-gateway',
+  serviceName: config.OTEL_SERVICE_NAME,
   environment: config.NODE_ENV,
   pretty: config.NODE_ENV === 'development',
 });
 
-// TODO Phase 4: Implement MCP protocol server
-// - Receive MCP tool-call requests
-// - Validate session token
-// - Forward to EXECUTION_GATEWAY_URL (the API)
-// - Stream responses back to MCP client
-// - Apply per-session tool allowlist from session.tools
+const app = Fastify({ logger: false });
 
-log.info(
-  { port: config.MCP_PORT, gatewayUrl: config.EXECUTION_GATEWAY_URL },
-  'Arcane MCP Gateway starting (stub — Phase 4)',
-);
+// ── Routes ────────────────────────────────────────────────────────────────────
 
-process.on('SIGTERM', () => {
-  void shutdownOtel().then(() => process.exit(0));
-});
+await app.register(registerMcpRoutes, { config });
+
+// ── Start ─────────────────────────────────────────────────────────────────────
+
+try {
+  await app.listen({ port: config.PORT, host: config.HOST });
+  log.info({ port: config.PORT, gateway: config.EXECUTION_GATEWAY_URL }, 'MCP Gateway started');
+} catch (err) {
+  log.error({ err }, 'MCP Gateway failed to start');
+  process.exit(1);
+}
+
+// ── Shutdown ──────────────────────────────────────────────────────────────────
+
+async function shutdown(signal: string): Promise<void> {
+  log.info({ signal }, 'MCP Gateway shutting down');
+  await app.close();
+  await shutdownOtel();
+  process.exit(0);
+}
+
+process.on('SIGTERM', () => void shutdown('SIGTERM'));
+process.on('SIGINT', () => void shutdown('SIGINT'));
