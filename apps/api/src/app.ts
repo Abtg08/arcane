@@ -5,7 +5,7 @@
  * without spawning a listener.
  */
 
-import Fastify, { type FastifyInstance, type FastifyBaseLogger } from 'fastify';
+import Fastify, { type FastifyInstance, type FastifyBaseLogger, type FastifyRequest, type FastifyReply } from 'fastify';
 import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
@@ -16,6 +16,17 @@ import { authMiddleware } from '@arcane/auth';
 import type { DbPool } from '@arcane/core';
 import type { ApiConfig } from '@arcane/config';
 import type { JetStreamClient } from 'nats';
+import {
+  collectPrometheusMetrics,
+  apiRequestCounter,
+  apiRequestDuration,
+  rateLimitCounter,
+} from '@arcane/telemetry';
+
+/** Internal type for the decorated Fastify instance after authMiddleware is registered */
+interface ArcaneApp extends FastifyInstance {
+  requireAuth: () => (req: FastifyRequest, reply: FastifyReply) => Promise<void>;
+}
 
 export interface AppDependencies {
   db: DbPool;
@@ -55,13 +66,20 @@ export async function buildApp(
     // Key: prefer API key prefix, fall back to IP
     keyGenerator: (req) =>
       (req.headers['x-api-key'] as string | undefined)?.slice(0, 16) ?? req.ip,
-    errorResponseBuilder: (_req, context) => ({
-      error: {
-        code: 'RATE_LIMITED',
-        message: `Rate limit exceeded. Retry after ${String(context.after)}.`,
-        request_id: crypto.randomUUID(),
-      },
-    }),
+    errorResponseBuilder: (req, context) => {
+      // Increment rate limit metric
+      rateLimitCounter.add(1, {
+        'rate_limit.key_type':
+          req.headers['x-api-key'] ? 'api_key' : 'ip',
+      });
+      return {
+        error: {
+          code: 'RATE_LIMITED',
+          message: `Rate limit exceeded. Retry after ${String(context.after)}.`,
+          request_id: crypto.randomUUID(),
+        },
+      };
+    },
   });
 
   // ─── OpenAPI docs ─────────────────────────────────────────────────────────────
@@ -113,12 +131,122 @@ export async function buildApp(
 
   // ─── Auth middleware ──────────────────────────────────────────────────────────
   // Registered before routes so req.apiKey / req.session decorators are available
-  const redis = new Redis(config.VALKEY_URL, { lazyConnect: true });
+  const redis = new Redis(config.VALKEY_URL, {
+    lazyConnect: true,
+    // Reject commands immediately when the connection is unavailable (test/offline mode).
+    // Without this, commands queue indefinitely while ioredis retries the connection.
+    maxRetriesPerRequest: 0,
+  });
   await app.register(authMiddleware, {
     db,
     redis,
     jwtSecret: config.JWT_SECRET,
     apiKeyPrefix: config.API_KEY_PREFIX,
+  });
+
+  // ─── Global auth pre-handler ──────────────────────────────────────────────────
+  // Populates req.apiKey or req.session when credentials are present.
+  // Routes still perform their own inline 401 check as defense-in-depth.
+  // Public paths (health, docs) are skipped so they remain unauthenticated.
+  app.addHook('preHandler', async (req: FastifyRequest, reply: FastifyReply) => {
+    const rawUrl = req.raw.url ?? '';
+    const path = rawUrl.split('?')[0] ?? '';
+    if (path === '/health' || path === '/metrics' || path === '/ready' || path.startsWith('/docs')) return;
+    const hasApiKey = !!req.headers['x-api-key'];
+    const hasBearer = (req.headers['authorization'] ?? '').startsWith('Bearer ');
+    if (!hasApiKey && !hasBearer) return; // inline route check will 401
+    // Catch auth errors here so they use our error format.
+    // Fastify does not route preHandler hook errors through the root setErrorHandler.
+    try {
+      await (app as unknown as ArcaneApp).requireAuth()(req, reply);
+    } catch (err) {
+      const statusCode = (err as { statusCode?: number }).statusCode ?? 401;
+      const code = (err as { code?: string }).code ?? 'UNAUTHORIZED';
+      const message = err instanceof Error ? err.message : 'Authentication failed';
+      return reply.status(statusCode).send({
+        error: { code, message, request_id: req.id },
+      });
+    }
+
+    // ── Per-key rate limiting (post-auth) ──────────────────────────────────────
+    // Applied after auth so we can key on the resolved API key ID.
+    // Falls through silently if Valkey is unavailable (SI-14: never authoritative).
+    if (req.apiKey) {
+      const keyId = req.apiKey.id;
+      const windowKey = `rate:key:${keyId}:${Math.floor(Date.now() / 60_000)}`;
+      try {
+        const count = await redis.incr(windowKey);
+        if (count === 1) await redis.expire(windowKey, 90); // 90s covers window + skew
+        if (count > config.RATE_LIMIT_PER_KEY_RPM) {
+          rateLimitCounter.add(1, { 'rate_limit.key_type': 'api_key_per_key' });
+          return reply.status(429).send({
+            error: {
+              code: 'RATE_LIMITED',
+              message: 'Per-key rate limit exceeded. Retry after 1 minute.',
+              request_id: req.id,
+            },
+          });
+        }
+      } catch {
+        // SI-14: Valkey unavailable → fail open; rate limit is defense-in-depth
+      }
+    }
+  });
+
+  // ─── Request metrics ──────────────────────────────────────────────────────────
+  // Track every request: method, route pattern, status code, duration.
+  // onRequest fires as early as possible to capture total latency.
+  app.addHook('onRequest', async (req) => {
+    (req as FastifyRequest & { _reqStart?: number })._reqStart = Date.now();
+  });
+
+  app.addHook('onResponse', async (req, reply) => {
+    const start = (req as FastifyRequest & { _reqStart?: number })._reqStart;
+    const durationMs = start !== undefined ? Date.now() - start : 0;
+    const routeUrl = (req.routeOptions?.url as string | undefined) ?? req.url.split('?')[0] ?? 'unknown';
+    const attrs = {
+      'http.method': req.method,
+      'http.route': routeUrl,
+      'http.status_code': String(reply.statusCode),
+    };
+    apiRequestCounter.add(1, attrs);
+    apiRequestDuration.record(durationMs, attrs);
+  });
+
+  // ─── /metrics — Prometheus scrape endpoint ────────────────────────────────────
+  // Public (no auth) — Prometheus scrapes from within the infra network only.
+  // The endpoint is intentionally excluded from the global preHandler auth check
+  // (same as /health) so it never blocks on missing credentials.
+  app.get('/metrics', async (_req, reply) => {
+    const body = await collectPrometheusMetrics();
+    if (body === null) {
+      // OTel not initialized (test environments) — return empty registry
+      return reply
+        .header('Content-Type', 'text/plain; version=0.0.4; charset=utf-8')
+        .send('# OTel not initialized\n');
+    }
+    return reply
+      .header('Content-Type', 'text/plain; version=0.0.4; charset=utf-8')
+      .send(body);
+  });
+
+  // ─── Global error handler ─────────────────────────────────────────────────────
+  // Must be registered BEFORE route plugins so child scopes inherit this handler.
+  // Fastify captures the error handler reference at plugin-registration time;
+  // registering after the plugins means they use the default handler instead.
+  app.setErrorHandler((error, req, reply) => {
+    req.log.error({ err: error }, 'Unhandled route error');
+
+    const statusCode = (error as { statusCode?: number }).statusCode ?? 500;
+    const code = (error as { code?: string }).code ?? 'INTERNAL_ERROR';
+
+    return reply.status(statusCode).send({
+      error: {
+        code,
+        message: statusCode === 500 ? 'Internal server error' : error.message,
+        request_id: req.id,
+      },
+    });
   });
 
   // ─── Routes ───────────────────────────────────────────────────────────────────
@@ -134,22 +262,6 @@ export async function buildApp(
   // TODO Phase 2+:
   // await app.register(import('./routes/policies.js'));
   // await app.register(import('./routes/admin.js'));
-
-  // ─── Global error handler ─────────────────────────────────────────────────────
-  app.setErrorHandler((error, req, reply) => {
-    req.log.error({ err: error }, 'Unhandled route error');
-
-    const statusCode = (error as { statusCode?: number }).statusCode ?? 500;
-    const code = (error as { code?: string }).code ?? 'INTERNAL_ERROR';
-
-    void reply.status(statusCode).send({
-      error: {
-        code,
-        message: statusCode === 500 ? 'Internal server error' : error.message,
-        request_id: req.id,
-      },
-    });
-  });
 
   return app;
 }
