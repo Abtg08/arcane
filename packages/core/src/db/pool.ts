@@ -63,6 +63,17 @@ export function getPool(): pg.Pool {
 }
 
 /**
+ * Override the pool with a test double. TEST USE ONLY.
+ * Allows in-process security tests to inject a mock without spawning a real Postgres.
+ * Must call shutdownPool() between tests to reset state.
+ *
+ * @internal
+ */
+export function _testSetPool(pool: pg.Pool): void {
+  _pool = pool;
+}
+
+/**
  * Execute a query on the pool. Wraps pg errors in DatabaseError.
  */
 export async function query<T extends pg.QueryResultRow = pg.QueryResultRow>(

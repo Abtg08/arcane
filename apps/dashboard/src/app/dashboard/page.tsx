@@ -1,5 +1,7 @@
 'use client';
 
+export const dynamic = 'force-dynamic';
+
 import { useExecutions } from '@/hooks/use-executions';
 import { useToolkits } from '@/hooks/use-toolkits';
 import { useConnections } from '@/hooks/use-connections';

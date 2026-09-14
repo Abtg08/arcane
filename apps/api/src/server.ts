@@ -13,7 +13,7 @@
 // OTel MUST be first — instruments pg, http, etc. at import time
 import { initOtel, initLogger, getLogger, shutdownOtel } from '@arcane/telemetry';
 import { loadConfig, ApiConfigSchema } from '@arcane/config';
-import { initPool, shutdownPool, checkDbHealth } from '@arcane/core';
+import { initPool, getPool, shutdownPool, checkDbHealth } from '@arcane/core';
 import { buildApp } from './app.js';
 
 const config = loadConfig(ApiConfigSchema, process.env);
@@ -47,7 +47,7 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
-  const app = await buildApp(config, log);
+  const app = await buildApp(config, log, { db: getPool() });
 
   await app.listen({ port: config.PORT, host: config.HOST });
   log.info({ port: config.PORT, host: config.HOST }, 'Arcane API listening');

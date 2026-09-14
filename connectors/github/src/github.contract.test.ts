@@ -28,7 +28,8 @@ describe('GITHUB_CONNECTOR_DEF', () => {
 
   it('auth is oauth2 with PKCE enabled (SI-16)', () => {
     expect(GITHUB_CONNECTOR_DEF.auth.type).toBe('oauth2');
-    const { oauth2 } = GITHUB_CONNECTOR_DEF.auth;
+    const auth = GITHUB_CONNECTOR_DEF.auth as import('@arcane/connector-sdk').OAuth2AuthDef;
+    const { oauth2 } = auth;
     expect(oauth2.pkce).toBe(true);
     expect(oauth2.scopes.length).toBeGreaterThan(0);
     expect(oauth2.authorization_url).toContain('github.com');

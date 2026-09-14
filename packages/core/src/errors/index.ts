@@ -65,7 +65,7 @@ export class ArcaneError extends Error {
     this.name = 'ArcaneError';
     this.code = code;
     this.statusCode = statusCode;
-    this.context = context;
+    if (context !== undefined) this.context = context;
     // Maintain proper stack trace in V8
     if (Error.captureStackTrace) {
       Error.captureStackTrace(this, ArcaneError);
@@ -143,7 +143,7 @@ export class RateLimitError extends ArcaneError {
   constructor(message: string = 'Rate limit exceeded', retryAfterMs?: number) {
     super('RATE_LIMITED', message, 429);
     this.name = 'RateLimitError';
-    this.retryAfterMs = retryAfterMs;
+    if (retryAfterMs !== undefined) this.retryAfterMs = retryAfterMs;
   }
 }
 

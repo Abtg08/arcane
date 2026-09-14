@@ -1,5 +1,8 @@
 import { Sidebar } from '@/components/layout/sidebar';
 
+// All dashboard pages fetch live API data — disable static prerendering
+export const dynamic = 'force-dynamic';
+
 export default function DashboardLayout({
   children,
 }: {

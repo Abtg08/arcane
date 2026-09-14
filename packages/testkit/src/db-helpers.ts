@@ -35,7 +35,7 @@ export async function withRollback<T>(fn: (client: DbClient) => Promise<T>): Pro
     throw { __rollback: true, result };
   }).catch((err: unknown) => {
     if (err && typeof err === 'object' && '__rollback' in err) {
-      return (err as { result: T }).result;
+      return (err as unknown as { result: T }).result;
     }
     throw err;
   });

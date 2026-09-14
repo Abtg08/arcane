@@ -23,12 +23,19 @@
 
 import type { FastifyInstance } from 'fastify';
 import { getPool, generateId } from '@arcane/core';
-import { NotFoundError, ForbiddenError, PolicyDeniedError, PolicyRequiresConfirmationError } from '@arcane/core';
+import { NotFoundError, ForbiddenError } from '@arcane/core';
 import { evaluatePolicy } from '@arcane/policy';
 import type { ApiConfig } from '@arcane/config';
 import type { UUIDv7 } from '@arcane/schemas';
 import type { JetStreamClient } from 'nats';
 import { SUBJECT_EXECUTIONS_RUN, encode, type ExecuteJobMessage } from '@arcane/nats-client';
+import {
+  executionCounter,
+  executionDuration,
+  executionErrorCounter,
+  policyEvalCounter,
+  policyDenialCounter,
+} from '@arcane/telemetry';
 
 interface ExecutionRouteContext {
   config: ApiConfig;
@@ -149,6 +156,7 @@ export default async function executionRoutes(
       if (!connection) throw new NotFoundError('Connection', body.connection_id);
 
       if (connection.status !== 'ACTIVE') {
+        executionErrorCounter.add(1, { 'error.type': 'connection_inactive' });
         throw new ForbiddenError(
           `Connection is ${connection.status} — reconnect required`,
         );
@@ -158,6 +166,7 @@ export default async function executionRoutes(
       const toolSlugFull = `${body.toolkit_slug}.${body.tool_slug}`;
 
       // Evaluate all active policies for this environment (Phase 2-A)
+      const execStart = Date.now();
       const policyResult = await evaluatePolicy(db, {
         environment_id: environmentId,
         tool_slug: body.tool_slug,
@@ -169,8 +178,16 @@ export default async function executionRoutes(
       const policyDecision = policyResult.decision;
       const policyReason = policyResult.reason;
 
+      // Metrics: count every policy evaluation with its outcome
+      policyEvalCounter.add(1, {
+        'policy.decision': policyDecision,
+        'tool.slug': toolSlugFull,
+      });
+
       if (policyDecision === 'DENY') {
-        // Write failed audit event immediately — credentials never loaded
+        policyDenialCounter.add(1, { 'tool.slug': toolSlugFull });
+        executionErrorCounter.add(1, { 'error.type': 'policy_denied', 'tool.slug': toolSlugFull });
+        // Write failed audit event immediately — credentials never loaded (SI-04, SI-11)
         await writeAuditEvent(db, {
           id: generateId(),
           execution_id: executionId,
@@ -180,7 +197,16 @@ export default async function executionRoutes(
           actor_id: req.apiKey?.id ?? (req.session?.id as UUIDv7),
           metadata: { tool: toolSlugFull, reason: policyReason },
         });
-        throw new PolicyDeniedError(toolSlugFull, policyReason ?? undefined);
+        // Respond directly to guarantee our error format (throwing bypasses setErrorHandler in some scopes)
+        return reply.status(403).send({
+          error: {
+            code: 'POLICY_DENIED',
+            message: policyReason
+              ? `Tool execution denied by policy: ${policyReason}`
+              : `Tool execution denied by policy: ${toolSlugFull}`,
+            request_id: req.id,
+          },
+        });
       }
 
       if (policyDecision === 'REQUIRE_CONFIRMATION') {
@@ -193,7 +219,14 @@ export default async function executionRoutes(
           actor_id: req.apiKey?.id ?? (req.session?.id as UUIDv7),
           metadata: { tool: toolSlugFull },
         });
-        throw new PolicyRequiresConfirmationError(toolSlugFull);
+        // Respond directly to guarantee our error format
+        return reply.status(202).send({
+          error: {
+            code: 'POLICY_REQUIRES_CONFIRMATION',
+            message: `Tool execution requires confirmation: ${toolSlugFull}`,
+            request_id: req.id,
+          },
+        });
       }
 
       // ── Step 4: Write AUTHORIZING audit event (SI-11) ────────────────────────────
@@ -244,6 +277,16 @@ export default async function executionRoutes(
         await js.publish(SUBJECT_EXECUTIONS_RUN, encode(job));
       }
       // If NATS not connected (test/dev), execution stays in AUTHORIZING until worker picks it up
+
+      // Metrics: execution accepted (AUTHORIZING → queued)
+      executionCounter.add(1, {
+        'tool.slug': toolSlugFull,
+        'execution.via_nats': String(!!js),
+      });
+      executionDuration.record(Date.now() - execStart, {
+        'tool.slug': toolSlugFull,
+        'execution.phase': 'authorizing',
+      });
 
       return reply.status(202).send({
         execution_id: executionId,

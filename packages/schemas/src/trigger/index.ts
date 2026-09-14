@@ -4,7 +4,7 @@
  */
 
 import { z } from 'zod';
-import { UUIDv7Schema, DateTimeSchema, MetadataSchema } from '../common.js';
+import { UUIDv7Schema, DateTimeSchema } from '../common.js';
 
 // ─── Trigger ──────────────────────────────────────────────────────────────────
 

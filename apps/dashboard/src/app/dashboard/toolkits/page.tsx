@@ -1,5 +1,7 @@
 'use client';
 
+export const dynamic = 'force-dynamic';
+
 import { useState, useCallback } from 'react';
 import { useToolkits, useTools } from '@/hooks/use-toolkits';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
