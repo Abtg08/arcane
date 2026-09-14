@@ -1,0 +1,19 @@
+[
+  { "id": "SI-01", "invariant": "Tool invocation payload to LLM never contains credentials", "enforced_in": "connector-runtime — only builds payload from sanitized tool output" },
+  { "id": "SI-02", "invariant": "Only connector-runtime resolves credentials", "enforced_in": "NATS job routing — API never touches raw secrets" },
+  { "id": "SI-03", "invariant": "secret_reference never in API responses", "enforced_in": "apps/api/src/routes/connections.ts" },
+  { "id": "SI-04", "invariant": "Policy check BEFORE credential resolution", "enforced_in": "apps/api/src/routes/executions.ts step 3 — evaluatePolicy() called before any credential lookup" },
+  { "id": "SI-05", "invariant": "Tool metadata (name/description) is untrusted data — never eval'd", "enforced_in": "apps/api/src/routes/tools.ts" },
+  { "id": "SI-06", "invariant": "Only PUBLISHED tool versions are executable", "enforced_in": "apps/api/src/routes/executions.ts step 1" },
+  { "id": "SI-07", "invariant": "Provider responses validated before return", "enforced_in": "packages/connector-runtime (Phase 8, pending)" },
+  { "id": "SI-08", "invariant": "SSRF protection on all outbound connector HTTP", "enforced_in": "packages/connector-runtime (Phase 8, pending)" },
+  { "id": "SI-09", "invariant": "MCP gateway delegates to the same execution gateway — no bypass", "enforced_in": "apps/mcp-gateway/src/index.ts" },
+  { "id": "SI-10", "invariant": "audit_events is append-only — no UPDATE or DELETE", "enforced_in": "apps/api/src/routes/executions.ts — writeAuditEvent() uses INSERT only" },
+  { "id": "SI-11", "invariant": "All executions logged before AND after", "enforced_in": "apps/api/src/routes/executions.ts steps 4 (AUTHORIZING) and 8 (completion)" },
+  { "id": "SI-12", "invariant": "Connector sandboxed — cannot access host filesystem or network arbitrarily", "enforced_in": "packages/connector-runtime (Phase 8, pending)" },
+  { "id": "SI-13", "invariant": "No raw SQL interpolation — all queries parameterized", "enforced_in": "All route files — $1, $2 placeholders only" },
+  { "id": "SI-14", "invariant": "Valkey is never authoritative — rate limit and session cache fail open", "enforced_in": "apps/api/src/app.ts rate limiter catch block; packages/auth/src/session/validate.ts" },
+  { "id": "SI-15", "invariant": "API keys stored as sha256 hash only — plaintext never persisted", "enforced_in": "packages/auth/src/apikey/generate.ts — hashApiKey()" },
+  { "id": "SI-16", "invariant": "OAuth PKCE S256 + atomic state consume (GET+DEL) prevents CSRF", "enforced_in": "packages/auth/src/oauth/state.ts; apps/api/src/routes/connections.ts callback" },
+  { "id": "SI-17", "invariant": "JWT HS256, issuer 'arcane', max 24h expiry", "enforced_in": "packages/auth/src/jwt/index.ts" }
+]

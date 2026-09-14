@@ -1,0 +1,28 @@
+{
+  "updated_at": "2026-09-14T14:34:09.472Z",
+  "last_completed": "Fixed AT-11 (SI-13 SQL injection test) — was deadlocking because ioredis with lazyConnect queues commands indefinitely on ECONNREFUSED. Added maxRetriesPerRequest: 0 to Redis constructor in apps/api/src/app.ts so failed connections reject immediately (caught by existing try/catch). Rewrote AT-11 to use shared Fastify app with a custom pool mock (_testSetPool) returning empty tool_versions rows. Full security suite now 15/15 in 4.4s. Both files committed to device: tests/security/execution-pipeline.security.test.ts and apps/api/src/app.ts.",
+  "next_up": "Push to GitHub from local VS Code terminal (cloud proxy blocks git push). Then start Phase 11 per EXECUTION_PLAN — check what Phase 11 is by reading the plan.",
+  "open_issues": [
+    "ioredis ECONNREFUSED stderr noise remains in test output (benign — caught by try/catch, tests pass)",
+    "git push must be done from local VS Code terminal not from cloud session"
+  ],
+  "test_counts": {
+    "total_tests": 519,
+    "test_files": 24,
+    "load_tests": 8,
+    "security_tests": 15,
+    "e2e_tests": 25,
+    "python_sdk_tests": 34
+  },
+  "commit_history_summary": [
+    "5c1822a — feat(tests): Phase 13 — in-process load tests",
+    "ea9e420 — feat(sdk-py): Python SDK — sync + async client, all resources, 34 tests",
+    "d1fd714 — Phase 11: full observability + per-key rate limiting",
+    "d0551d6 — Phase 10-B: fix all 25 vertical-slice E2E steps",
+    "aa0a894 — feat(security): Phase 10 — all 15 security acceptance tests passing",
+    "b03098d — feat: Phase 9 — 11 connectors",
+    "206b6ea — feat: Phase 8 — Dashboard",
+    "3c57a13 — feat: Phase 7 — CLI",
+    "03f845a — feat: Phase 6 — TypeScript SDK"
+  ]
+}

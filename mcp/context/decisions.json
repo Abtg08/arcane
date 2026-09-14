@@ -1,0 +1,18 @@
+[
+  { "decision": "No Elasticsearch/OpenSearch in V1", "rationale": "PostgreSQL FTS + pg_trgm is sufficient for V1 tool search" },
+  { "decision": "No LLM in authorization path", "rationale": "Deterministic policy engine only — LLMs are non-deterministic and must not gate security decisions" },
+  { "decision": "No vector search until lexical/metadata search proves inadequate", "rationale": "Avoid premature complexity" },
+  { "decision": "Postgres is NOT the queue", "rationale": "NATS JetStream for all async — polling Postgres creates lock contention at scale" },
+  { "decision": "Valkey is NOT authoritative state", "rationale": "Ephemeral only — rate limit and session cache always fail open (SI-14)" },
+  { "decision": "buildApp() takes deps: { db: DbPool } for testability", "rationale": "Allows mock DB injection in E2E and load tests without real Postgres" },
+  { "decision": "Policy engine fails closed on DB error (DENY)", "rationale": "Never fail-open past policy — a DB error must not silently allow execution (SI-04)" },
+  { "decision": "API key auth uses X-Api-Key header, NOT Authorization: Bearer", "rationale": "Bearer is reserved for JWT session tokens. requireAuth() routes X-Api-Key to validateApiKey(), Bearer to verifySessionToken()" },
+  { "decision": "API key prefix extraction: rawKey.slice(0, rawKey.lastIndexOf('_') + 9)", "rationale": "Key format is arc_live_<64hex>. Last underscore + 9 chars = arc_live_ + 8 hex chars = the stored prefix" },
+  { "decision": "Load tests use RATE_LIMIT_PER_KEY_RPM=10000 in testConfig", "rationale": "Prevents accidental self-throttling during load rounds. Rate-limit test pre-seeds the counter via _seedCounter helper instead" },
+  { "decision": "Rate-limit test uses dedicated KEY_ID_RL", "rationale": "Keeps exhausted counter isolated from main test key so mixed-workload test is not affected" },
+  { "decision": "vi.mock factories must use only inline literals", "rationale": "Vitest hoists vi.mock factories before const declarations — any module-level variable reference inside throws 'Cannot access X before initialization'" },
+  { "decision": "Python SDK uses plain dataclasses with from_dict(), no Pydantic", "rationale": "Minimizes dependencies for SDK consumers" },
+  { "decision": "PageResult uses .data field (not .items)", "rationale": "API response shape is { data: [], next_cursor, total } — the field is 'data'" },
+  { "decision": "ArcaneApiError exposes .status (not .status_code)", "rationale": "Consistent with the class definition in packages/auth/src/errors.ts" },
+  { "decision": "All deviations from master architecture require an ADR in docs/decisions/", "rationale": "Maintains architectural integrity and decision traceability" }
+]

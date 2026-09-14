@@ -1,0 +1,197 @@
+[
+  {
+    "number": 1,
+    "name": "Monorepo + infra (Postgres, Valkey, NATS, MinIO, OTel)",
+    "status": "done",
+    "key_files": [
+      "docker-compose.yml",
+      "infra/",
+      "pnpm-workspace.yaml"
+    ]
+  },
+  {
+    "number": 2,
+    "name": "packages/schemas, core, telemetry, config",
+    "status": "done",
+    "key_files": [
+      "packages/schemas/src/index.ts",
+      "packages/core/src/index.ts",
+      "packages/telemetry/src/index.ts",
+      "packages/config/src/index.ts"
+    ]
+  },
+  {
+    "number": 3,
+    "name": "Auth package: API keys, JWT, session middleware, OAuth state, rate limiting",
+    "status": "done",
+    "key_files": [
+      "packages/auth/src/apikey/generate.ts",
+      "packages/auth/src/apikey/validate.ts",
+      "packages/auth/src/jwt/index.ts",
+      "packages/auth/src/middleware/fastify.ts",
+      "packages/auth/src/session/validate.ts"
+    ]
+  },
+  {
+    "number": 4,
+    "name": "Connections/OAuth routes, tool discovery, execution gateway",
+    "status": "done",
+    "key_files": [
+      "apps/api/src/routes/connections.ts",
+      "apps/api/src/routes/tools.ts",
+      "apps/api/src/routes/executions.ts",
+      "apps/api/src/app.ts"
+    ]
+  },
+  {
+    "number": 5,
+    "name": "DB migrations + seed script",
+    "status": "done",
+    "key_files": [
+      "migrations/",
+      "scripts/seed.ts"
+    ]
+  },
+  {
+    "number": 6,
+    "name": "Policy engine: evaluator, repository, engine, 17 unit tests",
+    "status": "done",
+    "key_files": [
+      "packages/policy/src/evaluator.ts",
+      "packages/policy/src/repository.ts",
+      "packages/policy/src/engine.ts",
+      "packages/policy/src/evaluator.test.ts"
+    ]
+  },
+  {
+    "number": 7,
+    "name": "Secret abstraction + envelope encryption + KMS impl",
+    "status": "done",
+    "key_files": []
+  },
+  {
+    "number": 8,
+    "name": "Connector runtime: NATS publish, credential resolution, HTTP execution",
+    "status": "done",
+    "key_files": []
+  },
+  {
+    "number": 9,
+    "name": "GitHub connector (manifest + OAuth + 7 tools + contract + security tests)",
+    "status": "done",
+    "key_files": []
+  },
+  {
+    "number": 10,
+    "name": "Tool search: FTS + trigram + /v1/search/tools",
+    "status": "done",
+    "key_files": []
+  },
+  {
+    "number": 11,
+    "name": "MCP Gateway: Streamable HTTP, delegates to Execution Gateway",
+    "status": "done",
+    "key_files": [
+      "apps/mcp-gateway/src/index.ts",
+      "apps/mcp-gateway/src/mcp-gateway.test.ts"
+    ]
+  },
+  {
+    "number": 12,
+    "name": "Trigger/webhook infrastructure: ingress, NATS, workers, delivery",
+    "status": "done",
+    "key_files": [
+      "apps/webhook-ingress/src/index.ts",
+      "packages/trigger-worker/src/delivery.ts"
+    ]
+  },
+  {
+    "number": 13,
+    "name": "TypeScript SDK",
+    "status": "done",
+    "key_files": [
+      "packages/sdk-ts/src/client.ts",
+      "packages/sdk-ts/src/client.test.ts"
+    ]
+  },
+  {
+    "number": 14,
+    "name": "CLI",
+    "status": "done",
+    "key_files": [
+      "packages/cli/src/index.ts",
+      "packages/cli/src/cli.test.ts"
+    ]
+  },
+  {
+    "number": 15,
+    "name": "Dashboard (Next.js) + Execution Inspector",
+    "status": "done",
+    "key_files": [
+      "apps/dashboard/"
+    ]
+  },
+  {
+    "number": 16,
+    "name": "Remaining 11 connectors",
+    "status": "done",
+    "key_files": [
+      "connectors/slack/",
+      "connectors/discord/",
+      "connectors/gmail/",
+      "connectors/google-calendar/",
+      "connectors/google-drive/",
+      "connectors/notion/",
+      "connectors/linear/",
+      "connectors/hubspot/",
+      "connectors/shopify/",
+      "connectors/stripe/",
+      "connectors/microsoft-outlook/"
+    ]
+  },
+  {
+    "number": 17,
+    "name": "Security hardening — 15 mandatory acceptance tests",
+    "status": "done",
+    "key_files": [
+      "tests/security/execution-pipeline.security.test.ts"
+    ]
+  },
+  {
+    "number": 18,
+    "name": "Vertical slice E2E — full 25-step Appendix B",
+    "status": "done",
+    "key_files": [
+      "tests/integration/vertical-slice.e2e.test.ts"
+    ]
+  },
+  {
+    "number": 19,
+    "name": "Full observability + rate limiting at all levels",
+    "status": "done",
+    "key_files": [
+      "apps/api/src/app.ts (rate limiting, OTel metrics)"
+    ]
+  },
+  {
+    "number": 20,
+    "name": "Python SDK",
+    "status": "done",
+    "key_files": [
+      "packages/sdk-py/arcane/client.py",
+      "packages/sdk-py/arcane/http.py",
+      "packages/sdk-py/arcane/types.py",
+      "packages/sdk-py/arcane/resources/",
+      "packages/sdk-py/tests/test_client.py"
+    ]
+  },
+  {
+    "number": 21,
+    "name": "Load testing + operational readiness",
+    "status": "done",
+    "key_files": [
+      "tests/load/load.test.ts",
+      "tests/load/vitest.config.ts"
+    ]
+  }
+]

@@ -1,0 +1,62 @@
+{
+  "project": "Arcane",
+  "tagline": "Production-grade AI tool execution platform — API-first, multi-tenant, security-first",
+  "repo": "https://github.com/Abtg08/arcane",
+  "stack": {
+    "backend": "TypeScript, Node.js, Fastify, Zod, OpenAPI",
+    "database": "PostgreSQL + pgvector + FTS + pg_trgm",
+    "ephemeral": "Valkey (Redis-compatible)",
+    "messaging": "NATS JetStream",
+    "secrets": "Envelope encryption (KMS SaaS / OpenBao self-hosted)",
+    "storage": "S3-compatible (MinIO local, cloud prod)",
+    "observability": "OpenTelemetry + Prometheus + Grafana + Loki + Tempo",
+    "frontend": "Next.js, React, TypeScript, Tailwind, shadcn/ui, TanStack Query",
+    "python_sdk": "httpx, dataclasses, pytest + respx",
+    "deployment": "Docker Compose local → containerized prod → Helm later"
+  },
+  "repo_structure": {
+    "apps/api": "Fastify REST API — main backend",
+    "apps/mcp-gateway": "MCP Streamable HTTP gateway",
+    "apps/webhook-ingress": "Webhook ingress (HMAC verify → NATS)",
+    "apps/dashboard": "Next.js dashboard",
+    "packages/schemas": "Zod schemas + TypeScript types (shared)",
+    "packages/core": "DB pool, errors, secrets abstraction",
+    "packages/auth": "API key hashing, JWT, session middleware, OAuth, rate limiting",
+    "packages/config": "Env config with Zod validation",
+    "packages/telemetry": "OpenTelemetry setup",
+    "packages/policy": "Policy engine — evaluator, repository, engine",
+    "packages/search": "FTS + trigram tool search",
+    "packages/sdk-ts": "TypeScript SDK (ArcaneClient)",
+    "packages/sdk-py": "Python SDK (ArcaneClient + AsyncArcaneClient)",
+    "packages/cli": "arcane CLI (login/exec/triggers/toolkits)",
+    "packages/connector-runtime": "NATS-based connector execution",
+    "packages/trigger-worker": "Trigger delivery worker",
+    "packages/nats-client": "NATS JetStream client wrapper",
+    "connectors/": "11 connectors: GitHub, Slack, Discord, Gmail, Google Calendar, Google Drive, Notion, Linear, HubSpot, Shopify, Stripe, Outlook",
+    "tests/load": "In-process load tests (Fastify inject())",
+    "tests/integration": "Vertical slice E2E (25 steps)",
+    "tests/security": "15 security acceptance tests",
+    "migrations/": "PostgreSQL migrations",
+    "infra/": "Docker Compose, OTel collector config",
+    "mcp/": "Local MCP context server (this server)"
+  },
+  "auth_model": {
+    "api_key_header": "X-Api-Key (NOT Authorization: Bearer)",
+    "api_key_format": "arc_live_<64hex>",
+    "api_key_storage": "sha256 hash only — plaintext never stored",
+    "session_auth": "Bearer JWT (HS256, issuer: arcane, max 24h)"
+  },
+  "non_negotiables": [
+    "Secrets never enter LLM context",
+    "Credentials never leave execution boundary",
+    "Every execution has authenticated tenant identity",
+    "Every execution is policy checked BEFORE credential resolution",
+    "Tool permissions are granular (action-level)",
+    "Connected accounts are tenant and user isolated",
+    "SSRF protection mandatory",
+    "Tool metadata is untrusted data",
+    "Provider responses are untrusted",
+    "API keys are write-only secrets (hash-only in DB)",
+    "audit_events is append-only"
+  ]
+}
