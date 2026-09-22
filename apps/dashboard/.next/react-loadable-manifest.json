@@ -1,10 +1,14 @@
 {
-  "..\\..\\..\\node_modules\\.pnpm\\@tanstack+query-devtools@5.102.8\\node_modules\\@tanstack\\query-devtools\\build\\index.js -> ./DevtoolsComponent-Cb-WvQCr.js": {
-    "id": null,
-    "files": []
+  "..\\..\\..\\node_modules\\.pnpm\\@tanstack+query-devtools@5.102.8\\node_modules\\@tanstack\\query-devtools\\build\\dev.js -> ./DevtoolsComponent-CFsAhafd.js": {
+    "id": "..\\..\\..\\node_modules\\.pnpm\\@tanstack+query-devtools@5.102.8\\node_modules\\@tanstack\\query-devtools\\build\\dev.js -> ./DevtoolsComponent-CFsAhafd.js",
+    "files": [
+      "static/chunks/_app-pages-browser_node_modules_pnpm_tanstack_query-devtools_5_102_8_node_modules_tanstack_qu-7b6c42.js"
+    ]
   },
-  "..\\..\\..\\node_modules\\.pnpm\\@tanstack+query-devtools@5.102.8\\node_modules\\@tanstack\\query-devtools\\build\\index.js -> ./DevtoolsPanelComponent-Be8narGM.js": {
-    "id": null,
-    "files": []
+  "..\\..\\..\\node_modules\\.pnpm\\@tanstack+query-devtools@5.102.8\\node_modules\\@tanstack\\query-devtools\\build\\dev.js -> ./DevtoolsPanelComponent-B9zkHqmD.js": {
+    "id": "..\\..\\..\\node_modules\\.pnpm\\@tanstack+query-devtools@5.102.8\\node_modules\\@tanstack\\query-devtools\\build\\dev.js -> ./DevtoolsPanelComponent-B9zkHqmD.js",
+    "files": [
+      "static/chunks/_app-pages-browser_node_modules_pnpm_tanstack_query-devtools_5_102_8_node_modules_tanstack_qu-b2f84b.js"
+    ]
   }
 }

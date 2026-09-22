@@ -30,32 +30,15 @@
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
-    "prettier": "^3.3.3",
-    "tsx": "^4.19.0",
-    "typescript": "^5.5.4",
-    "eslint": "^9.9.0",
     "@typescript-eslint/eslint-plugin": "^8.3.0",
     "@typescript-eslint/parser": "^8.3.0",
-    "eslint-config-prettier": "^9.1.0"
-  },
-  "main": "eslint.config.js",
-  "directories": {
-    "doc": "docs",
-    "test": "tests"
+    "eslint": "^9.9.0",
+    "eslint-config-prettier": "^9.1.0",
+    "prettier": "^3.3.3",
+    "tsx": "^4.19.0",
+    "typescript": "^5.5.4"
   },
   "dependencies": {
     "pg": "^8.23.0"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://Abtg08: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@github.com/Abtg08/arcane.git"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "type": "commonjs",
-  "bugs": {
-    "url": "https://github.com/Abtg08/arcane/issues"
-  },
-  "homepage": "https://github.com/Abtg08/arcane#readme"
+  }
 }
