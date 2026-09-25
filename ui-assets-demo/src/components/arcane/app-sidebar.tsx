@@ -1,8 +1,9 @@
-import { Link, useRouterState } from "@tanstack/react-router";
+import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import {
   Activity,
   Blocks,
   LayoutDashboard,
+  LogOut,
   PanelLeftClose,
   PanelLeftOpen,
   Plug,
@@ -10,6 +11,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { BrandLogo } from "@/components/arcane/brand-logo";
+import { clearStoredApiKey } from "@/lib/auth";
 
 const EXEC_SEARCH = { status: "all", toolkit: "all", from: "", to: "", page: 1 } as const;
 
@@ -29,6 +31,12 @@ export function AppSidebar({
   onToggle: () => void;
 }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const navigate = useNavigate();
+
+  function handleLogout() {
+    clearStoredApiKey();
+    navigate({ to: "/login" });
+  }
 
   return (
     <aside
@@ -79,6 +87,20 @@ export function AppSidebar({
           {expanded ? <PanelLeftClose className="size-4" /> : <PanelLeftOpen className="size-4" />}
           {expanded && <span>Collapse</span>}
         </button>
+
+        <button
+          type="button"
+          onClick={handleLogout}
+          title="Sign out"
+          className={cn(
+            "mt-0.5 flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-sm text-muted-foreground transition-colors hover:bg-sidebar-accent/60 hover:text-sidebar-foreground",
+            !expanded && "justify-center px-0",
+          )}
+        >
+          <LogOut className="size-4 shrink-0" />
+          {expanded && <span>Sign out</span>}
+        </button>
+
         <p
           className={cn(
             "mt-1 px-2.5 py-1 font-mono text-[10px] uppercase tracking-wider text-muted-foreground",

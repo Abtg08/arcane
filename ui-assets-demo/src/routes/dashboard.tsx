@@ -1,11 +1,17 @@
 import { useState } from "react";
-import { Outlet, createFileRoute, useNavigate, useRouterState } from "@tanstack/react-router";
+import { Outlet, createFileRoute, redirect, useNavigate, useRouterState } from "@tanstack/react-router";
 import { ChevronRight } from "lucide-react";
 import { AppSidebar } from "@/components/arcane/app-sidebar";
 import { USING_MOCK_DATA } from "@/lib/api";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { isAuthenticated } from "@/lib/auth";
 
 export const Route = createFileRoute("/dashboard")({
+  beforeLoad: () => {
+    if (!isAuthenticated()) {
+      throw redirect({ to: "/login" });
+    }
+  },
   component: DashboardLayout,
 });
 

@@ -1,15 +1,16 @@
 import * as mock from "./mock-data";
+import { getStoredApiKey } from "./auth";
 import type { Connection, Execution, ListResponse, Tool, Toolkit, Trigger } from "./types";
 
 /**
  * Arcane API client.
  *
- * Set VITE_API_BASE_URL (e.g. http://localhost:3001) and VITE_API_KEY to talk
- * to the real service. With no base URL configured the client serves the local
- * mock dataset using the exact same response shapes.
+ * Auth priority: localStorage key (set via /login) → VITE_API_KEY env var → empty.
+ * Set VITE_API_BASE_URL (e.g. http://localhost:3001) to talk to the real service.
+ * With no base URL configured the client serves the local mock dataset.
  */
 const BASE_URL = (import.meta.env["VITE_API_BASE_URL"] as string | undefined) ?? "";
-const API_KEY = (import.meta.env["VITE_API_KEY"] as string | undefined) ?? "";
+const ENV_API_KEY = (import.meta.env["VITE_API_KEY"] as string | undefined) ?? "";
 
 export const USING_MOCK_DATA = BASE_URL.trim().length === 0;
 
@@ -19,12 +20,16 @@ function delay<T>(value: T): Promise<T> {
   return new Promise((resolve) => setTimeout(() => resolve(value), MOCK_LATENCY_MS));
 }
 
+function resolveApiKey(): string {
+  return getStoredApiKey() ?? ENV_API_KEY;
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE_URL}${path}`, {
     ...init,
     headers: {
       "Content-Type": "application/json",
-      "X-Api-Key": API_KEY,
+      "X-Api-Key": resolveApiKey(),
       ...(init?.headers ?? {}),
     },
   });
