@@ -145,22 +145,30 @@ async function seed(): Promise<void> {
     );
     const resolvedGithubToolkitVersionId = ghVersionRows[0]!.id;
 
-    await client.query(
-      `INSERT INTO auth_configs (id, toolkit_id, name, auth_type, configuration_schema, authorization_config)
-       VALUES ($1, $2, 'GitHub OAuth', 'OAUTH2', $3, $4)
-       ON CONFLICT DO NOTHING`,
-      [
-        githubAuthConfigId,
-        resolvedGithubToolkitId,
-        JSON.stringify({ type: 'object', properties: {} }),
-        JSON.stringify({
-          authorization_url: 'https://github.com/login/oauth/authorize',
-          token_url: 'https://github.com/login/oauth/access_token',
-          client_id: process.env['GITHUB_CLIENT_ID'] ?? 'YOUR_GITHUB_CLIENT_ID',
-          default_scopes: ['repo', 'read:user'],
-        }),
-      ],
+    // Upsert auth_config for GitHub — no unique constraint on (toolkit_id, name)
+    const { rows: existingGhAuth } = await client.query<{ id: string }>(
+      `SELECT id FROM auth_configs WHERE toolkit_id = $1 AND name = 'GitHub OAuth'`,
+      [resolvedGithubToolkitId],
     );
+    const ghAuthConfig = JSON.stringify({
+      authorization_url: 'https://github.com/login/oauth/authorize',
+      token_url: 'https://github.com/login/oauth/access_token',
+      client_id: process.env['GITHUB_CLIENT_ID'] ?? 'YOUR_GITHUB_CLIENT_ID',
+      client_secret: process.env['GITHUB_CLIENT_SECRET'] ?? 'YOUR_GITHUB_CLIENT_SECRET',
+      default_scopes: ['repo', 'read:user'],
+    });
+    if (existingGhAuth[0]) {
+      await client.query(
+        `UPDATE auth_configs SET authorization_config = $1, updated_at = NOW() WHERE id = $2`,
+        [ghAuthConfig, existingGhAuth[0].id],
+      );
+    } else {
+      await client.query(
+        `INSERT INTO auth_configs (id, toolkit_id, name, auth_type, configuration_schema, authorization_config)
+         VALUES ($1, $2, 'GitHub OAuth', 'OAUTH2', $3, $4)`,
+        [githubAuthConfigId, resolvedGithubToolkitId, JSON.stringify({ type: 'object', properties: {} }), ghAuthConfig],
+      );
+    }
 
     await client.query(
       `INSERT INTO tools (id, toolkit_id, slug, name, description, status)
@@ -235,22 +243,30 @@ async function seed(): Promise<void> {
     );
     const resolvedSlackToolkitVersionId = slackVersionRows[0]!.id;
 
-    await client.query(
-      `INSERT INTO auth_configs (id, toolkit_id, name, auth_type, configuration_schema, authorization_config)
-       VALUES ($1, $2, 'Slack OAuth', 'OAUTH2', $3, $4)
-       ON CONFLICT DO NOTHING`,
-      [
-        slackAuthConfigId,
-        resolvedSlackToolkitId,
-        JSON.stringify({ type: 'object', properties: {} }),
-        JSON.stringify({
-          authorization_url: 'https://slack.com/oauth/v2/authorize',
-          token_url: 'https://slack.com/api/oauth.v2.access',
-          client_id: process.env['SLACK_CLIENT_ID'] ?? 'YOUR_SLACK_CLIENT_ID',
-          default_scopes: ['channels:read', 'chat:write'],
-        }),
-      ],
+    // Upsert auth_config for Slack — same pattern
+    const { rows: existingSlackAuth } = await client.query<{ id: string }>(
+      `SELECT id FROM auth_configs WHERE toolkit_id = $1 AND name = 'Slack OAuth'`,
+      [resolvedSlackToolkitId],
     );
+    const slackAuthConfig = JSON.stringify({
+      authorization_url: 'https://slack.com/oauth/v2/authorize',
+      token_url: 'https://slack.com/api/oauth.v2.access',
+      client_id: process.env['SLACK_CLIENT_ID'] ?? 'YOUR_SLACK_CLIENT_ID',
+      client_secret: process.env['SLACK_CLIENT_SECRET'] ?? 'YOUR_SLACK_CLIENT_SECRET',
+      default_scopes: ['channels:read', 'chat:write'],
+    });
+    if (existingSlackAuth[0]) {
+      await client.query(
+        `UPDATE auth_configs SET authorization_config = $1, updated_at = NOW() WHERE id = $2`,
+        [slackAuthConfig, existingSlackAuth[0].id],
+      );
+    } else {
+      await client.query(
+        `INSERT INTO auth_configs (id, toolkit_id, name, auth_type, configuration_schema, authorization_config)
+         VALUES ($1, $2, 'Slack OAuth', 'OAUTH2', $3, $4)`,
+        [slackAuthConfigId, resolvedSlackToolkitId, JSON.stringify({ type: 'object', properties: {} }), slackAuthConfig],
+      );
+    }
 
     await client.query(
       `INSERT INTO tools (id, toolkit_id, slug, name, description, status)

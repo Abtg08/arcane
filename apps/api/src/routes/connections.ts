@@ -18,6 +18,7 @@ import { generateId, getPool } from '@arcane/core';
 import { NotFoundError, ValidationError } from '@arcane/core';
 import { createOAuthState, generatePkceChallenge, consumeOAuthState } from '@arcane/auth';
 import { Redis } from 'ioredis';
+import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
 import type { ApiConfig } from '@arcane/config';
 import type { UUIDv7 } from '@arcane/schemas';
 
@@ -25,11 +26,58 @@ interface ConnectionRouteContext {
   config: ApiConfig;
 }
 
+// ── Envelope encryption helpers (SI-02, SI-03) ────────────────────────────────
+// In production these would use KMS (aws-kms, gcp-kms, openbao).
+// For local dev, SECRET_ENCRYPTION_KEY is the master key.
+
+function envelopeEncrypt(plaintext: string, masterKeyHex: string): string {
+  const masterKey = Buffer.from(masterKeyHex, 'hex');
+  // Generate a random data encryption key (DEK)
+  const dek = randomBytes(32);
+  // Encrypt the DEK with the master key (AES-256-GCM)
+  const dekIv = randomBytes(12);
+  const dekCipher = createCipheriv('aes-256-gcm', masterKey, dekIv);
+  const encDek = Buffer.concat([dekCipher.update(dek), dekCipher.final()]);
+  const dekTag = dekCipher.getAuthTag();
+  // Encrypt the plaintext with the DEK (AES-256-GCM)
+  const dataIv = randomBytes(12);
+  const dataCipher = createCipheriv('aes-256-gcm', dek, dataIv);
+  const encData = Buffer.concat([dataCipher.update(plaintext, 'utf8'), dataCipher.final()]);
+  const dataTag = dataCipher.getAuthTag();
+  // Pack: dekIv(12) + dekTag(16) + encDek(32) + dataIv(12) + dataTag(16) + encData(*)
+  const packed = Buffer.concat([dekIv, dekTag, encDek, dataIv, dataTag, encData]);
+  return packed.toString('base64');
+}
+
+function envelopeDecrypt(packed64: string, masterKeyHex: string): string {
+  const masterKey = Buffer.from(masterKeyHex, 'hex');
+  const buf = Buffer.from(packed64, 'base64');
+  let off = 0;
+  const dekIv = buf.subarray(off, off += 12);
+  const dekTag = buf.subarray(off, off += 16);
+  const encDek = buf.subarray(off, off += 32);
+  const dataIv = buf.subarray(off, off += 12);
+  const dataTag = buf.subarray(off, off += 16);
+  const encData = buf.subarray(off);
+  // Decrypt the DEK
+  const dekDecipher = createDecipheriv('aes-256-gcm', masterKey, dekIv);
+  dekDecipher.setAuthTag(dekTag);
+  const dek = Buffer.concat([dekDecipher.update(encDek), dekDecipher.final()]);
+  // Decrypt the data
+  const dataDecipher = createDecipheriv('aes-256-gcm', dek, dataIv);
+  dataDecipher.setAuthTag(dataTag);
+  return Buffer.concat([dataDecipher.update(encData), dataDecipher.final()]).toString('utf8');
+}
+
+// Exported for use by execution routes
+export { envelopeDecrypt };
+
 export default async function connectionRoutes(
   fastify: FastifyInstance,
   { config }: ConnectionRouteContext,
 ): Promise<void> {
   const redis = new Redis(config.VALKEY_URL, { lazyConnect: true, enableOfflineQueue: false });
+  await redis.connect();
 
   // ─── GET /connections — list connections for an external user ─────────────────
 
@@ -228,7 +276,7 @@ export default async function connectionRoutes(
         connection_id: connectionId as UUIDv7,
         connector_slug: body.toolkit_slug,
         code_verifier: pkce?.code_verifier ?? '',
-        redirect_uri: body.redirect_uri ?? `${config.OAUTH_REDIRECT_BASE_URL}/callback`,
+        redirect_uri: body.redirect_uri ?? `${config.OAUTH_REDIRECT_BASE_URL}/connections/oauth/callback`,
         created_at: Date.now(),
       });
 
@@ -237,7 +285,7 @@ export default async function connectionRoutes(
       const params = new URLSearchParams({
         client_id: authCfg.client_id,
         response_type: 'code',
-        redirect_uri: body.redirect_uri ?? `${config.OAUTH_REDIRECT_BASE_URL}/callback`,
+        redirect_uri: body.redirect_uri ?? `${config.OAUTH_REDIRECT_BASE_URL}/connections/oauth/callback`,
         scope: scopes.join(' '),
         state: stateToken,
         ...(pkce
@@ -259,15 +307,15 @@ export default async function connectionRoutes(
     },
   );
 
-  // ─── POST /connections/oauth/callback — exchange code for token ───────────────
+  // ─── GET /connections/oauth/callback — exchange code for token ────────────────
 
-  fastify.post(
+  fastify.get(
     '/connections/oauth/callback',
     {
       schema: {
         tags: ['connections'],
         summary: 'Handle OAuth callback — exchange code for connection',
-        body: {
+        querystring: {
           type: 'object',
           required: ['code', 'state'],
           properties: {
@@ -278,45 +326,140 @@ export default async function connectionRoutes(
       },
     },
     async (req, reply) => {
-      if (!req.apiKey) {
-        return reply.status(401).send({ error: { code: 'UNAUTHORIZED', message: 'API key required' } });
-      }
-
-      const { code: _code, state } = req.body as { code: string; state: string };
-      void _code; // code forwarded to connector-runtime via NATS in Phase 3
+      const { code, state } = req.query as { code: string; state: string };
 
       // Consume state (one-time use — CSRF protection, SI-16)
       const oauthState = await consumeOAuthState(redis, state);
 
-      // Validate environment matches (prevent cross-env state injection)
-      if (oauthState.environment_id !== req.apiKey.environment_id) {
-        return reply.status(403).send({ error: { code: 'FORBIDDEN', message: 'State environment mismatch' } });
+      // State was already validated by consumeOAuthState (one-time use, CSRF).
+      // No API key on this route — it's a browser redirect from the provider.
+
+      const db = getPool();
+
+      // ── Look up the auth config to get token_url + client credentials ────────
+      const { rows: connRows } = await db.query<{
+        toolkit_id: string;
+        auth_config_id: string;
+      }>(
+        `SELECT toolkit_id, auth_config_id FROM connected_accounts WHERE id = $1`,
+        [oauthState.connection_id],
+      );
+      const conn = connRows[0];
+      if (!conn) throw new NotFoundError('Connection', oauthState.connection_id);
+
+      const { rows: acRows } = await db.query<{
+        authorization_config: Record<string, unknown>;
+        auth_type: string;
+      }>(
+        `SELECT authorization_config, auth_type FROM auth_configs WHERE id = $1`,
+        [conn.auth_config_id],
+      );
+      const authConfig = acRows[0];
+      if (!authConfig) throw new NotFoundError('AuthConfig', conn.auth_config_id);
+
+      const authCfg = authConfig.authorization_config as {
+        token_url: string;
+        client_id: string;
+        client_secret: string;
+      };
+
+      if (!authCfg.token_url || !authCfg.client_id || !authCfg.client_secret) {
+        throw new ValidationError('OAuth configuration incomplete — missing token_url, client_id, or client_secret');
       }
 
-      // Delegate actual token exchange to connector-runtime via NATS
-      // connector-runtime: resolves KMS, exchanges code, envelopes secret, stores secret_reference
-      // We publish a job and wait for the result (or use direct call in Phase 3)
-      //
-      // TODO Phase 3: publish NATS job and await result
-      // For now, mark connection as requiring async completion
-      const db = getPool();
+      // ── Exchange authorization code for access token ────────────────────────
+      const tokenBody = new URLSearchParams({
+        client_id: authCfg.client_id,
+        client_secret: authCfg.client_secret,
+        code,
+        redirect_uri: oauthState.redirect_uri,
+        ...(oauthState.code_verifier ? { code_verifier: oauthState.code_verifier } : {}),
+      });
+
+      const tokenRes = await fetch(authCfg.token_url, {
+        method: 'POST',
+        headers: { Accept: 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: tokenBody.toString(),
+        signal: AbortSignal.timeout(10_000),
+      });
+
+      if (!tokenRes.ok) {
+        const errText = await tokenRes.text().catch(() => '');
+        fastify.log.error({ status: tokenRes.status, body: errText }, 'OAuth token exchange failed');
+        await db.query(
+          `UPDATE connected_accounts SET status = 'FAILED', metadata = metadata || $2 WHERE id = $1`,
+          [oauthState.connection_id, JSON.stringify({ _token_error: errText.slice(0, 500), _failed_at: new Date().toISOString() })],
+        );
+        return reply.status(502).send({
+          error: { code: 'TOKEN_EXCHANGE_FAILED', message: 'Failed to exchange authorization code for token' },
+        });
+      }
+
+      const tokenData = await tokenRes.json() as {
+        access_token: string;
+        token_type?: string;
+        refresh_token?: string;
+        expires_in?: number;
+        scope?: string;
+        error?: string;
+      };
+
+      if (tokenData.error || !tokenData.access_token) {
+        fastify.log.error({ tokenData }, 'OAuth token response contained error');
+        await db.query(
+          `UPDATE connected_accounts SET status = 'FAILED', metadata = metadata || $2 WHERE id = $1`,
+          [oauthState.connection_id, JSON.stringify({ _token_error: tokenData.error ?? 'no access_token', _failed_at: new Date().toISOString() })],
+        );
+        return reply.status(502).send({
+          error: { code: 'TOKEN_EXCHANGE_FAILED', message: tokenData.error ?? 'No access token in response' },
+        });
+      }
+
+      // ── Envelope-encrypt the tokens (SI-02, SI-03) ─────────────────────────
+      const secretPayload = JSON.stringify({
+        access_token: tokenData.access_token,
+        refresh_token: tokenData.refresh_token ?? null,
+        token_type: tokenData.token_type ?? 'bearer',
+        scope: tokenData.scope ?? null,
+      });
+
+      const encryptionKey = config.SECRET_ENCRYPTION_KEY;
+      if (!encryptionKey) {
+        throw new ValidationError('SECRET_ENCRYPTION_KEY not configured — cannot store credentials');
+      }
+
+      const secretReference = envelopeEncrypt(secretPayload, encryptionKey);
+
+      // ── Store encrypted reference + mark ACTIVE ─────────────────────────────
+      const expiresAt = tokenData.expires_in
+        ? new Date(Date.now() + tokenData.expires_in * 1000)
+        : null;
+
       await db.query(
         `UPDATE connected_accounts
-         SET status = 'PENDING', metadata = metadata || $2
+         SET status = 'ACTIVE',
+             secret_reference = $2,
+             metadata = metadata || $3,
+             expires_at = $4,
+             updated_at = NOW()
          WHERE id = $1`,
         [
           oauthState.connection_id,
+          secretReference,
           JSON.stringify({
-            _oauth_code_received: true,
+            _oauth_completed: true,
             _callback_at: new Date().toISOString(),
+            token_type: tokenData.token_type ?? 'bearer',
+            scope: tokenData.scope ?? null,
           }),
+          expiresAt,
         ],
       );
 
-      return reply.status(202).send({
+      return reply.status(200).send({
         connection_id: oauthState.connection_id,
-        status: 'PENDING',
-        message: 'OAuth code received. Connection will be activated once credentials are stored.',
+        status: 'ACTIVE',
+        message: 'OAuth connection established. Credentials encrypted and stored.',
       });
     },
   );
